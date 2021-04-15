@@ -1,0 +1,61 @@
+---
+title: "PreregistrationEvaluation_Main_Source_Raw"
+author: "Marton Kovacs"
+date: 'r format(Sys.time(), "%d %B, %Y")`'
+output: html_document
+---
+
+# Load packages
+
+```{r}
+library(tidyverse)
+library(writexl)
+library(readxl)
+```
+
+# Import data
+
+```{r}
+source <- read_csv("Data/Main/Source/PreregistrationEvaluation_MainSurvey_November+6,+2020_13.57.csv")
+```
+
+# Saving comments
+
+We are saving the response ids and the comments of the participants in a separate datafile.
+
+```{r}
+comments <- 
+  source %>%
+  select(ResponseId,
+         comment) %>% 
+  mutate(changed_comment = NA_character_)
+```
+
+```{r, eval = FALSE}
+write_xlsx(comments, "Data/Main/Source/PreregistrationEvaluation_Main_Comments.xlsx")
+```
+
+# Import comments
+
+One of the authors goes through the responses and checks if there are any respondents who indicated that they want their response to be deleted. And delete personal infromation from the comments so it can be shared.
+
+```{r}
+checked_comments <- read_xlsx("Data/Main/Source/PreregistrationEvaluation_Main_Comments.xlsx")
+```
+
+Join the comment datatable with the source data.
+
+```{r}
+source <-
+  source %>%
+  select(-comment) %>% 
+  left_join(., checked_comments, by = "ResponseId")
+```
+
+There were no respondents who indicated that they want their data to be deleted. However, we deleted personal information from one of the comments. This change is tracked in the [changed_comment] variable.
+
+# Write data
+
+```{r}
+write_tsv(source, "Data/Main/Raw/PreregistrationEvaluation_Main_Raw.tsv")
+```

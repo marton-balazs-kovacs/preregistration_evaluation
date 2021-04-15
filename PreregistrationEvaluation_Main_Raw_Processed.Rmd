@@ -1,0 +1,165 @@
+---
+title: "PreregistrationEvaluation_Main_Raw_Processed"
+author: "Marton Kovacs & Bence Bakos"
+date: "18/12/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Load packages
+
+```{r packages, message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+# Import data
+
+```{r import data, message=FALSE}
+raw_data <- read_tsv("Data/Main/Raw/PreregistrationEvaluation_Main_Raw.tsv")
+
+# Clean variable names
+raw_data <- janitor::clean_names(raw_data)
+```
+
+# Changing response
+
+R_Z3mrRm2XJpVRZcd  meant to respond strongly agree: 'For the question about whether preregistration made it easier to avoid questionable research practices, I meant to select "Strongly agree", but selected "strongly disagree" by mistake. Please change my response to "Strongly Agree"'
+
+The respondent actually gave the "Very Strongly Disagree" answer.
+
+```{r changing response}
+raw_data <- raw_data %>%
+  mutate(other_qrp = case_when(response_id == "R_Z3mrRm2XJpVRZcd" ~ "Strongly Agree",
+                               TRUE ~ other_qrp))
+```
+
+
+# Filtering responses
+
+  * The analysis will concentrate only on the answers of the Preregistration Group and the Control Group.
+  * Unfinished responses are excluded.
+  * Participants who did not accept the informed consent form are excluded.
+  * An attention check was used and participants who failed to pass it will be excluded.
+
+```{r}
+# Removing Qualtrics labels
+label <-
+  raw_data %>% 
+  slice(1:2)
+
+raw_data <-
+  raw_data %>% 
+  slice(-(1:2))
+
+# Get the groups of interest
+group_interest <- c("prereg", "control")
+
+# Filtering data
+filtered_data <- raw_data %>% 
+  filter(finished == "True",
+         progress == "100",
+         informed_consent == "Yes",
+         group %in% group_interest,
+         group == "control" & control_attention == "4\nFour" | group == "prereg" & prereg_attention == "4\nFour")
+
+# How many respondents do we have from the Prereg and the Control groups?
+filtered_data %>% 
+  count(group)
+
+# How many respondents do we have from all the groups?
+raw_data %>% 
+  filter(finished == "True",
+         progress == "100",
+         informed_consent == "Yes",
+         group == "control" & control_attention == "4\nFour" | group == "prereg" & prereg_attention == "4\nFour" | group == "other" & other_attention == "4\nFour") %>% 
+  count(group)
+
+# How many respondents do we have from each research type?
+filtered_data %>% 
+  count(research_type)
+```
+
+# Removing irrelevant variables
+
+```{r removing}
+filtered_data <- filtered_data %>% 
+  select(response_id, duration_in_seconds, control_hypothesis:prereg_qrp, planning:changed_comment, -control_attention, -prereg_attention)
+
+glimpse(filtered_data)
+```
+
+# Tidying and recoding data
+
+Several response variables need to be recoded to numeric values. As a first step, several keys are created to make the recoding process easier. Second, the keys are applied.
+
+```{r tidying}
+tidy_data <- 
+  filtered_data %>% 
+  # Gather all the columns with "prereg_" or "control_" prefix
+  pivot_longer(
+    cols = union(contains("prereg_"),contains("control_")),
+    names_to = "variable_names",
+    values_to = "values"
+  ) %>% 
+  # Response was forced so all NA values mean that the participant was not member of that group
+  # So we can drop them
+  drop_na(values) %>% 
+  # Delete prefix and convert character variables to numeric
+  mutate(variable_names = str_remove(variable_names, "prereg_|control_"),
+         # Because there is a mismatch in the variable names between the control and prereg group
+         variable_names = case_when(variable_names == "rmd" ~ "rdm",
+                                    TRUE ~ variable_names)
+         # values = case_when(values == "I do not know" ~ "0",
+         #                    values == "Not applicable" ~ "99",
+         #                    values == "Very Strongly Disagree" ~ "1",
+         #                    values == "Strongly Disagree" ~ "2",
+         #                    values == "Disagree" ~ "3",
+         #                    values == "Neither Agree or Disagree" ~ "4",
+         #                    values == "Agree" ~ "5",
+         #                    values == "Strongly Agree" ~ "6",
+         #                    values == "Very Strongly Agree" ~ "7",
+         #                    TRUE ~ values),
+         # values = as.integer(str_extract(values, "[0-9]{1,2}"))
+         ) %>% 
+  # Spread gathered columns to make the datatable tidy
+  pivot_wider(
+    names_from = variable_names,
+    values_from = values
+  )
+```
+
+# Grouping research fields
+
+We group our respondents into research fields based on their responses to an open-ended question regarding their research field. We do the same for respondents who answered "Other" to our research type question.
+
+Not preregistered: We realized that a lot of respondents provided their detailed opinion on preregistration as a comment. We will read through these comments and we will extract possible challenges mentioned in them to discuss them in the paper.
+
+```{r fields, eval=FALSE}
+fields <- tidy_data %>% 
+  select(response_id, field) %>% 
+  add_column(final_field = NA)
+
+writexl::write_xlsx(fields, "Data/Main/Processed/Export/PreregistrationEvaluation_Fields_Old.xlsx")
+
+type_other <- tidy_data %>% 
+  filter(research_type == "Other") %>% 
+  select(response_id, research_type_6_text) %>% 
+  drop_na(research_type_6_text) %>% 
+  add_column(final_research_type = NA)
+
+writexl::write_xlsx(type_other, "Data/Main/Processed/Export/PreregistrationEvaluation_Type_Other.xlsx")
+
+challanges <- tidy_data %>% 
+  select(response_id, comment) %>% 
+  drop_na(comment) %>% 
+  add_column(group = NA)
+
+writexl::write_xlsx(challanges, "Data/Main/Processed/Export/PreregistrationEvaluation_Challanges.xlsx")
+```
+
+# Write data
+
+```{r export}
+write_tsv(tidy_data, "Data/Main/Processed/PreregistrationEvaluation_Main_Processed.tsv")
+```

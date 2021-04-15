@@ -1,0 +1,189 @@
+---
+title: "PreregistrationEvaluation_Pilot_Grouping"
+author: "Marton Kovacs"
+date: 'r format(Sys.time(), "%d %B, %Y")`'
+output: html_document
+---
+
+# Load packages
+
+```{r}
+library(tidyverse)
+library(writexl)
+library(readxl)
+```
+
+# Import data
+
+We extracted the responses of the researchers from their response email by hand and copied it in a google spreadsheet.
+
+```{r}
+raw <- read_tsv("Data/Pilot/Raw/PreregistrationEvaluation_Pilot_Raw_data.tsv")
+```
+
+# Preparing the dataset for separation
+
+For the separation we add a new variable for the separated answers called [response_01]. Each of the new separated answers for the same response will be copied to a new variable in the same row.
+
+```{r}
+separate <- 
+  raw %>% 
+  mutate(response_01 = NA_character_)
+```
+
+# Saving the dataset
+
+```{r}
+write_xlsx(separate, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Separating_data.xlsx")
+
+write_tsv(separate, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Separating_data.tsv")
+```
+
+# Import data
+
+We went through all the responses and separated the responses by their content from the same researcher into new variables.
+
+```{r}
+separated <- read_tsv("Data/Pilot/Processed/Import/PreregistrationEvaluation_Pilot_Separated_data.tsv")
+```
+
+# Dropped responses
+
+We drop the responses that are not about preregistration (but explicitly talking about registered reports.)
+
+We dropped one response because of this reason.
+
+```{r}
+separated <-
+  separated %>% 
+  filter(response_id != 35)
+```
+
+# Preparing the dataset for the coding
+
+We are passing only half of the dataset for coding, and we will use the other half for the validation of the groups.
+
+```{r}
+code <-
+  separated %>% 
+  gather(key = "response_no", value = "response_separate", -response_id, -response_raw) %>% 
+  drop_na() %>% 
+  mutate(response_no = str_remove(response_no, "response_"),
+         code = NA_character_) %>% 
+  arrange(response_id) %>% 
+  slice(1:69)
+```
+
+# Descriptive statistics of the responses
+
+Number of respondents whose responses were used in further analysis:
+
+```{r}
+code %>% 
+  distinct(response_id) %>% 
+  count()
+```
+
+Distribution of the number of responses from each respondent:
+
+```{r}
+code %>% 
+  group_by(response_no) %>% 
+  count()
+```
+
+# Saving the dataset
+
+```{r}
+write_xlsx(code, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Coding_data.xlsx")
+
+write_tsv(code, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Coding_data.tsv")
+```
+
+# Import data
+
+```{r}
+coded <- read_tsv("Data/Pilot/Processed/Import/PreregistrationEvaluation_Pilot_Coded_data.tsv")
+```
+
+# Preparing the dataset for the grouping
+
+```{r}
+group <-
+  coded %>% 
+  filter(code != "insufficient information") %>% 
+  group_by(code) %>% 
+  count() %>% 
+  mutate(group = NA_character_)
+```
+
+# Saving the dataset
+
+```{r}
+write_xlsx(group, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Grouping_data.xlsx")
+
+write_tsv(group, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Grouping_data.tsv")
+```
+
+# Import data
+
+```{r}
+grouped <- read_tsv("Data/Pilot/Processed/Import/PreregistrationEvaluation_Pilot_Grouped_data.tsv")
+```
+
+# Preparing the groups for the creation of the dimensions
+
+```{r}
+items <-
+  grouped %>% 
+  filter(group != "insufficient information",
+         group != "irrelevant content") %>% 
+  distinct(group)
+```
+
+# Saving the dataset
+
+```{r}
+write_xlsx(items, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_ItemCreation_data.xlsx")
+
+write_tsv(items, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_ItemCreation_data.tsv")
+```
+
+# Validation of the grouping process
+
+```{r}
+validation <-
+  separated %>% 
+  gather(key = "response_no", value = "response_separate", -response_id, -response_raw) %>% 
+  drop_na() %>% 
+  mutate(response_no = str_remove(response_no, "response_"),
+         group_validation = NA_character_) %>% 
+  arrange(response_id) %>% 
+  slice(70:156)
+```
+
+# Create definition for the groups
+
+```{r}
+definition <-
+  grouped %>% 
+  filter(group != "insufficient information",
+         group != "irrelevant content") %>% 
+  group_by(group) %>% 
+  summarise(definition = str_c(code, collapse = "; ")) %>% 
+  mutate(definition = tolower(definition))
+```
+
+# Saving the dataset
+
+```{r}
+# Responses to be valdiated
+write_xlsx(validation, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Validation_data.xlsx")
+
+write_tsv(validation, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Validation_data.tsv")
+
+# Definitions of the groups
+write_xlsx(definition, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Definition_data.xlsx")
+
+write_tsv(definition, "Data/Pilot/Processed/Export/PreregistrationEvaluation_Pilot_Definition_data.tsv")
+```
