@@ -60,6 +60,7 @@ Check if there are only distinct type of links to the papers and distinct titles
 email_database %>% 
   count(link) %>% 
   filter(n != 1)
+# There is one double link but that leads to the volume and not a specific paper so it is fine.
 
 email_database %>% 
   count(title) %>% 
@@ -135,6 +136,14 @@ email_database <-
   arrange(last_name, email)
 ```
 
+# Write database witouth email addresses
+
+```{r}
+email_database %>% 
+  select(-email, -contains_osf_aspredicted, -number_of_names) %>% 
+  write_xlsx(., "Data/Sample/PreregistrationEvaluation_Prereg_Filtered_ContactDatabase.xlsx")
+```
+
 # Select needed variables
 
 ```{r}
@@ -148,7 +157,7 @@ email_database <-
 ```{r}
 email_database %>% 
   slice(1:50) %>%
-  write_xlsx(., "Data/PreregistrationEvaluation_Sample_Batch1.xlsx")
+  write_xlsx(., "Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch1.xlsx")
 ```
 
 # Write second batch
@@ -156,7 +165,25 @@ email_database %>%
 ```{r}
 email_database %>% 
   slice(51:487) %>%
-  write_xlsx(., "Data/PreregistrationEvaluation_Sample_Batch2.xlsx")
+  write_xlsx(., "Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch2.xlsx")
+```
+
+# Checking the samples
+
+```{r}
+prereg_batch_1 <- read_xlsx("Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch1.xlsx")
+
+prereg_batch_2 <- read_xlsx("Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch2.xlsx")
+
+prereg_batch_3 <- read_xlsx("Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch3.xlsx")
+
+prereg_sample <- bind_rows(prereg_batch_1, prereg_batch_2, prereg_batch_3)
+
+anti_join(email_database, prereg_sample)
+# In all the 5 cases a non match is present because the email address was changed in the sample
+
+anti_join(prereg_sample, email_database)
+# The same as before
 ```
 
 # Control group sample selection

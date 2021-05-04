@@ -61,7 +61,8 @@ List all the questions for each group.
 ```{r}
 survey_questions <-
   expand_grid(groups = groups,
-              vars = vars)
+              vars = vars) %>% 
+  mutate(type = add_questions_type(vars))
 ```
 
 Get the levels of each question per group. Some questions has different labels depending on which group the respondents belongs to as questions were worded differently for the preregistration and the control group. See the survey materials for more detail.
@@ -103,18 +104,21 @@ survey_questions <-
                                   factor_group = .x)))
 ```
 
-Create one table out of nested information with more descriptive variable and question names.
+Create one table out of nested information with more descriptive variable and question names. We will create this table only for the Likert-type questions.
+
 
 ```{r}
 survey_questions_table <- 
   survey_questions %>% 
+  filter(type == "likert") %>%
   select(groups, vars, var_desc) %>% 
   unnest(var_desc) %>% 
   dplyr::group_by(groups, vars) %>% 
   dplyr::mutate(N = sum(n),
                 prop = round(n / N * 100, 2)) %>% 
   select(-N, -levels_int) %>% 
-  mutate(vars = vars_rename(vars)) %>% 
+  mutate(vars = vars_rename(vars),
+         groups = groups_rename(groups)) %>% 
   arrange(vars, groups) %>% 
   rename(`Survey question` = vars,
          Group = groups,
@@ -128,7 +132,40 @@ Create an APA formatted table for the paper.
 ```{r}
 papaja::apa_table(
   survey_questions_table,
-  caption = "A Full Summary of All Survey Questions Per Group",
+  caption = "A Full Summary of the Likert-type Survey Questions Per Group",
+  escape = TRUE
+)
+```
+
+For the intervall type questions we will calculate the mean and SD for each question per group. We will also present the results in a table.
+
+```{r}
+# Get the id of the questions
+interval_vars <- c("hypothesis", "design", "analysis", "rdm", "workflow", "collab", "preparatory", "duration", "stress")
+
+interval_survey_questions_table <- 
+  processed %>%
+  select(response_id, group, all_of(interval_vars)) %>%
+  pivot_longer(
+    all_of(interval_vars),
+    names_to = "vars",
+    values_to = "values") %>% 
+  filter(values != "I do not know",
+         values != "Not applicable") %>% 
+  mutate(values = as.integer(str_extract(values, "[0-9]{1,2}")), 
+         vars = vars_rename(vars)) %>%  
+  group_by(group, vars) %>% 
+  summarise(Mean = round(mean(values, na.rm = TRUE), 2),
+            SD = round(sd(values, na.rm = TRUE), 2),
+            N = n()) %>% 
+  mutate(group = groups_rename(group)) %>% 
+  arrange(vars, group) %>% 
+  rename(`Survey question` = vars,
+         Group = group)
+
+papaja::apa_table(
+  interval_survey_questions_table,
+  caption = "A Full Summary of the Interval Survey Questions Per Group",
   escape = TRUE
 )
 ```
@@ -156,17 +193,17 @@ Three of the questions were using a Likert-scale. We show the proportion of the 
 likert_plot_var_recommend <- "recommend"
 
 # Create the plot
-likert_plot_recommend <- likert_plot_odd(survey_questions, likert_plot_var_recommend, limits = c(-0.5, 1), text_push = 0.01)
+likert_plot_recommend <- likert_plot_odd(survey_questions, likert_plot_var_recommend, limits = c(-0.5, 1.02), text_push = 0.01)
 
 likert_plot_recommend
 
 # Save for the paper
-ggsave("Figures/likert_plot_recommend.tiff", device = "tiff", plot = likert_plot_recommend, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_recommend.tiff", device = "tiff", plot = likert_plot_recommend, dpi = 300, width = 50, height = 15, units = "cm")
 
-ggsave("Figures/likert_plot_recommend.eps", device = "eps", plot = likert_plot_recommend, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_recommend.eps", device = "eps", plot = likert_plot_recommend, dpi = 300, width = 50, height = 15, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/likert_plot_recommend.png", device = "png", plot = likert_plot_recommend, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_recommend.png", device = "png", plot = likert_plot_recommend, dpi = 300, width = 50, height = 15, units = "cm")
 
 # Get the id of the questions
 likert_plot_var_qrp <- "qrp"
@@ -177,12 +214,12 @@ likert_plot_qrp <- likert_plot_odd(survey_questions, likert_plot_var_qrp, limits
 likert_plot_qrp
 
 # Save for the paper
-ggsave("Figures/likert_plot_qrp.tiff", device = "tiff", plot = likert_plot_qrp, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_qrp.tiff", device = "tiff", plot = likert_plot_qrp, dpi = 300, width = 50, height = 15, units = "cm")
 
-ggsave("Figures/likert_plot_qrp.eps", device = "eps", plot = likert_plot_qrp, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_qrp.eps", device = "eps", plot = likert_plot_qrp, dpi = 300, width = 50, height = 15, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/likert_plot_qrp.png", device = "png", plot = likert_plot_qrp, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_qrp.png", device = "png", plot = likert_plot_qrp, dpi = 300, width = 50, height = 15, units = "cm")
 ```
 
 We show the last Likert-scale question with different scale separately.
@@ -195,12 +232,12 @@ likert_plot_var_planning <- "planning"
 likert_plot_planning <- likert_plot_odd(survey_questions, likert_plot_var_planning, limits = c(-1, 1), text_push = 0.02)
 
 # Save for the paper
-ggsave("Figures/likert_plot_planning.tiff", device = "tiff", plot = likert_plot_planning, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_planning.tiff", device = "tiff", plot = likert_plot_planning, dpi = 300, width = 50, height = 15, units = "cm")
 
-ggsave("Figures/likert_plot_planning.eps", device = "eps", plot = likert_plot_planning, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_planning.eps", device = "eps", plot = likert_plot_planning, dpi = 300, width = 50, height = 15, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/likert_plot_planning.png", device = "png", plot = likert_plot_planning, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/likert_plot_planning.png", device = "png", plot = likert_plot_planning, dpi = 300, width = 50, height = 15, units = "cm")
 ```
 
 The other questions were using a 7 point scale that we will treat as an interval scale. This plot presents the mean rating per question per group with the 95% CI as the errorbar.
@@ -212,15 +249,12 @@ The other questions were using a 7 point scale that we will treat as an interval
 ## jitter scatter and bar
 ## this basic
 
-# Get the id of the questions
-interval_plot_vars <- c("hypothesis", "design", "analysis", "rdm", "workflow", "collab", "preparatory", "duration", "stress")
-
 # Modify the data for plotting
 interval_plot_data <- 
   processed %>%
-  select(response_id, group, all_of(interval_plot_vars)) %>%
+  select(response_id, group, all_of(interval_vars)) %>%
   pivot_longer(
-    all_of(interval_plot_vars),
+    all_of(interval_vars),
     names_to = "vars",
     values_to = "values") %>% 
   filter(values != "I do not know",
@@ -279,13 +313,13 @@ interval_plot <-
   ## Points of prereg group with nudged position
   geom_point(
     data = pick(groups == "Yes"),
-    size = 4.5,
+    size = 8,
     shape = 21,
     position = position_nudge(x = -0.3, y = 0)) +
   ## Points of control group without nudged position
   geom_point(
     data = pick(groups == "No"),
-    size = 4.5,
+    size = 8,
     shape = 21) +
   geom_text(
     aes(
@@ -293,8 +327,8 @@ interval_plot <-
       y = 7,
       label = round(mean_difference, 2)),
     inherit.aes = FALSE,
-    size = 6,
-    hjust = -.65) +
+    size = 8,
+    hjust = -.1) +
   scale_fill_manual(values = c("white", "black")) +
   scale_x_continuous(
     breaks = as.integer(unique(interval_plot_data$vars)),
@@ -314,30 +348,29 @@ interval_plot <-
   theme(axis.title = element_text(size = 30),
         axis.text.y.right = element_blank(),
         axis.ticks.y.right = element_blank(),
-        axis.text = element_text(size = 15),
-        legend.text = element_text(size = 15),
-        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 25),
         legend.position = c(.2, .8),
         plot.margin = unit(c(.5, .5, .5, .5), "cm"))
   
-
 interval_plot
 
 # Save for the paper
-ggsave("Figures/interval_plot.tiff", device = "tiff", plot = interval_plot, dpi = 300, width = 45, height = 25, units = "cm")
+ggsave("Figures/interval_plot.tiff", device = "tiff", plot = interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
 
-ggsave("Figures/interval_plot.eps", device = "eps", plot = interval_plot, dpi = 300, width = 45, height = 25, units = "cm")
+ggsave("Figures/interval_plot.eps", device = "eps", plot = interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/interval_plot.png", device = "png", plot = interval_plot, dpi = 300, width = 45, height = 25, units = "cm")
+ggsave("Figures/interval_plot.png", device = "png", plot = interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
 
 ## Second version order based on the mean rating of the groups
 # Modify the data for plotting
 interval_plot_data_second <- 
   processed %>%
-  select(response_id, group, all_of(interval_plot_vars)) %>%
+  select(response_id, group, all_of(interval_vars)) %>%
   pivot_longer(
-    all_of(interval_plot_vars),
+    all_of(interval_vars),
     names_to = "vars",
     values_to = "values") %>% 
   filter(values != "I do not know",
@@ -367,7 +400,8 @@ interval_plot_data_second <-
          groups = case_when(groups == "control" ~ "No",
                             groups == "prereg" ~ "Yes"),
          vars = as.factor(vars),
-         vars = fct_reorder(vars, mean_avg))
+         vars = fct_reorder(vars, mean_avg)) %>% 
+  arrange(desc(mean_avg))
 
 # Create the plot
 interval_plot_second <-
@@ -399,13 +433,13 @@ interval_plot_second <-
   ## Points of prereg group with nudged position
   geom_point(
     data = pick(groups == "Yes"),
-    size = 4.5,
+    size = 8,
     shape = 21,
     position = position_nudge(x = -0.3, y = 0)) +
   ## Points of control group without nudged position
   geom_point(
     data = pick(groups == "No"),
-    size = 4.5,
+    size = 8,
     shape = 21) +
   geom_text(
     aes(
@@ -413,8 +447,8 @@ interval_plot_second <-
       y = 7,
       label = round(mean_difference, 2)),
     inherit.aes = FALSE,
-    size = 6,
-    hjust = -.65) +
+    size = 8,
+    hjust = -.1) +
   scale_fill_manual(values = c("white", "black")) +
   scale_x_continuous(
     breaks = as.integer(unique(interval_plot_data_second$vars)),
@@ -433,22 +467,21 @@ interval_plot_second <-
   theme(axis.title = element_text(size = 30),
         axis.text.y.right = element_blank(),
         axis.ticks.y.right = element_blank(),
-        axis.text = element_text(size = 15),
-        legend.text = element_text(size = 15),
-        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 25),
         legend.position = c(.2, .8),
         plot.margin = unit(c(.5, .5, .5, .5), "cm"))
   
 interval_plot_second
 
 # Save for the paper
-ggsave("Figures/interval_plot_second.tiff", device = "tiff", plot = interval_plot_second, dpi = 300, width = 45, height = 25, units = "cm")
+ggsave("Figures/interval_plot_second.tiff", device = "tiff", plot = interval_plot_second, dpi = 300, width = 50, height = 25, units = "cm")
 
-ggsave("Figures/interval_plot_second.eps", device = "eps", plot = interval_plot_second, dpi = 300, width = 45, height = 25, units = "cm")
+ggsave("Figures/interval_plot_second.eps", device = "eps", plot = interval_plot_second, dpi = 300, width = 50, height = 25, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/interval_plot_second.png", device = "png", plot = interval_plot_second, dpi = 300, width = 45, height = 25, units = "cm")
-
+ggsave("Figures/interval_plot_second.png", device = "png", plot = interval_plot_second, dpi = 300, width = 50, height = 25, units = "cm")
 ```
 
 # Responses by research type group for all survey questions
@@ -490,7 +523,8 @@ List all the questions for each group.
 ```{r}
 research_type_questions <-
   expand_grid(groups = research_type_groups,
-              vars = vars)
+              vars = vars) %>% 
+  mutate(type = add_questions_type(vars))
 ```
 
 Get the levels of each question per group.
@@ -533,13 +567,15 @@ Create one table out of nested information with more descriptive variable and qu
 ```{r}
 research_type_questions_table <- 
   research_type_questions %>% 
+  filter(type == "likert") %>% 
   select(groups, vars, var_desc) %>% 
   unnest(var_desc) %>% 
   dplyr::group_by(groups, vars) %>% 
   dplyr::mutate(N = sum(n),
                 prop = round(n / N * 100, 2)) %>% 
   select(-N, -levels_int) %>% 
-  mutate(vars = vars_rename(vars)) %>% 
+  mutate(vars = vars_rename(vars),
+         groups = groups_rename(groups)) %>% 
   arrange(vars, groups) %>% 
   rename(`Survey question` = vars,
          Group = groups,
@@ -554,6 +590,36 @@ Create an APA formatted table for the paper.
 papaja::apa_table(
   research_type_questions_table,
   caption = "A Full Summary of All Survey Questions Per Research Type for Preregistration Group",
+  escape = TRUE
+)
+```
+
+For the interval type questions we calculate the mena and SD and present the same in a table per group.
+
+```{r}
+interval_survey_questions_table <- 
+  research_type_data %>%
+  select(response_id, research_type_group, all_of(interval_vars)) %>% 
+  pivot_longer(
+    all_of(interval_vars),
+    names_to = "vars",
+    values_to = "values") %>% 
+  filter(values != "I do not know",
+         values != "Not applicable") %>% 
+  mutate(values = as.integer(str_extract(values, "[0-9]{1,2}")), 
+         vars = vars_rename(vars),
+         research_type_group = groups_rename(research_type_group)) %>% 
+  group_by(research_type_group, vars) %>% 
+  summarise(Mean = round(mean(values, na.rm = TRUE), 2),
+            SD = round(sd(values, na.rm = TRUE), 2),
+            N = n()) %>% 
+  arrange(vars, research_type_group) %>% 
+  rename(`Survey question` = vars,
+         Group = research_type_group)
+
+papaja::apa_table(
+  interval_survey_questions_table,
+  caption = "A Full Summary of the Interval Survey Questions Per Research Type",
   escape = TRUE
 )
 ```
@@ -581,12 +647,12 @@ Creating plots for the Likert-type scales.
 research_type_likert_plot_recommend <- likert_plot_odd(research_type_questions, likert_plot_var_recommend, limits = c(-0.5, 1), text_push = 0.02)
 
 # Save for the paper
-ggsave("Figures/research_type_likert_plot_recommend.tiff", device = "tiff", plot = research_type_likert_plot_recommend, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_recommend.tiff", device = "tiff", plot = research_type_likert_plot_recommend, dpi = 300, width = 50, height = 15, units = "cm")
 
-ggsave("Figures/research_type_likert_plot_recommend.eps", device = "eps", plot = research_type_likert_plot_recommend, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_recommend.eps", device = "eps", plot = research_type_likert_plot_recommend, dpi = 300, width = 50, height = 15, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/research_type_likert_plot_recommend.png", device = "png", plot = research_type_likert_plot_recommend, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_recommend.png", device = "png", plot = research_type_likert_plot_recommend, dpi = 300, width = 50, height = 15, units = "cm")
 ```
 
 ```{r}
@@ -594,12 +660,12 @@ ggsave("Figures/research_type_likert_plot_recommend.png", device = "png", plot =
 research_type_likert_plot_qrp <- likert_plot_odd(research_type_questions, likert_plot_var_qrp, limits = c(-0.5, 1), text_push = 0.02)
 
 # Save for the paper
-ggsave("Figures/research_type_likert_plot_qrp.tiff", device = "tiff", plot = research_type_likert_plot_qrp, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_qrp.tiff", device = "tiff", plot = research_type_likert_plot_qrp, dpi = 300, width = 50, height = 15, units = "cm")
 
-ggsave("Figures/research_type_likert_plot_qrp.eps", device = "eps", plot = research_type_likert_plot_qrp, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_qrp.eps", device = "eps", plot = research_type_likert_plot_qrp, dpi = 300, width = 50, height = 15, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/research_type_likert_plot_qrp.png", device = "png", plot = research_type_likert_plot_qrp, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_qrp.png", device = "png", plot = research_type_likert_plot_qrp, dpi = 300, width = 50, height = 15, units = "cm")
 ```
 
 ```{r}
@@ -607,12 +673,12 @@ ggsave("Figures/research_type_likert_plot_qrp.png", device = "png", plot = resea
 research_type_likert_plot_planning <- likert_plot_odd(survey_questions, likert_plot_var_planning, limits = c(-1, 1), text_push = 0.02)
 
 # Save for the paper
-ggsave("Figures/research_type_likert_plot_planning.tiff", device = "tiff", plot = research_type_likert_plot_planning, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_planning.tiff", device = "tiff", plot = research_type_likert_plot_planning, dpi = 300, width = 50, height = 15, units = "cm")
 
-ggsave("Figures/research_type_likert_plot_planning.eps", device = "eps", plot = research_type_likert_plot_planning, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_planning.eps", device = "eps", plot = research_type_likert_plot_planning, dpi = 300, width = 50, height = 15, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/research_type_likert_plot_planning.png", device = "png", plot = research_type_likert_plot_planning, dpi = 300, width = 40, height = 10, units = "cm")
+ggsave("Figures/research_type_likert_plot_planning.png", device = "png", plot = research_type_likert_plot_planning, dpi = 300, width = 50, height = 15, units = "cm")
 ```
 
 The other questions were using a 7 point scale that we will treat as an interval scale. This plot presents the mean rating per question per group with the 95% CI as the errorbar.
@@ -621,9 +687,9 @@ The other questions were using a 7 point scale that we will treat as an interval
 # Modify the data for plotting
 research_type_interval_plot_data <- 
   research_type_data %>%
-  select(response_id, research_type_group, all_of(interval_plot_vars)) %>%
+  select(response_id, research_type_group, all_of(interval_vars)) %>%
   pivot_longer(
-    all_of(interval_plot_vars),
+    all_of(interval_vars),
     names_to = "vars",
     values_to = "values") %>% 
   filter(values != "I do not know",
@@ -635,6 +701,9 @@ research_type_interval_plot_data <-
             sd = sd(values, na.rm = TRUE),
             n = n(),
             se = sd / sqrt(n)) %>% 
+    group_by(vars) %>% 
+  mutate(mean_avg = mean(mean)) %>% 
+  ungroup() %>% 
   pivot_wider(
     names_from = research_type_group,
     values_from = c(mean, sd, n, se)) %>% 
@@ -648,9 +717,10 @@ research_type_interval_plot_data <-
     names_from = variables,
     values_from = values) %>% 
   mutate(groups = case_when(groups == "testing" ~ "Testing",
-                            groups == "else" ~ "Else")) %>%
-  mutate(vars = as.factor(vars),
-         vars = fct_reorder(vars, mean_difference))
+                            groups == "else" ~ "Else"),
+         vars = as.factor(vars),
+         vars = fct_reorder(vars, mean_avg)) %>% 
+  arrange(desc(mean_avg))
 
 # Create the plot
 research_type_interval_plot <-
@@ -682,22 +752,22 @@ research_type_interval_plot <-
   ## Points of prereg group with nudged position
   geom_point(
     data = pick(groups == "Testing"),
-    size = 4.5,
+    size = 8,
     shape = 21,
     position = position_nudge(x = -0.3, y = 0)) +
   ## Points of control group without nudged position
   geom_point(
     data = pick(groups == "Else"),
-    size = 4.5,
+    size = 8,
     shape = 21) +
   geom_text(
     aes(
       x = as.integer(vars),
       y = 7,
-      label = round(mean_difference, 2)),
+      label = sprintf("%0.2f", round(mean_difference, 2))),
     inherit.aes = FALSE,
-    size = 6,
-    hjust = -.40) +
+    size = 8,
+    hjust = -.1) +
   scale_fill_manual(values = c("white", "black")) +
   scale_x_continuous(
     breaks = as.integer(unique(research_type_interval_plot_data$vars)),
@@ -715,19 +785,21 @@ research_type_interval_plot <-
   theme(axis.title = element_text(size = 30),
         axis.text.y.right = element_blank(),
         axis.ticks.y.right = element_blank(),
-        axis.text = element_text(size = 15),
-        legend.text = element_text(size = 15),
-        legend.title = element_text(size = 20),
+        axis.text = element_text(size = 20),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 25),
         legend.position = c(.2, .8),
         plot.margin = unit(c(.5, .5, .5, .5), "cm"))
 
-# Save for the paper
-ggsave("Figures/research_type_interval_plot.tiff", device = "tiff", plot = research_type_interval_plot, dpi = 300,  width = 45, height = 25, units = "cm")
+research_type_interval_plot
 
-ggsave("Figures/research_type_interval_plot.eps", device = "eps", plot = research_type_interval_plot, dpi = 300, width = 45, height = 25, units = "cm")
+# Save for the paper
+ggsave("Figures/research_type_interval_plot.tiff", device = "tiff", plot = research_type_interval_plot, dpi = 300,  width = 50, height = 28, units = "cm")
+
+ggsave("Figures/research_type_interval_plot.eps", device = "eps", plot = research_type_interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
 
 # Save for the manuscript
-ggsave("Figures/research_type_interval_plot.png", device = "png", plot = research_type_interval_plot, dpi = 300, width = 45, height = 25, units = "cm")
+ggsave("Figures/research_type_interval_plot.png", device = "png", plot = research_type_interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
 ```
 
 # Background information
@@ -747,9 +819,14 @@ fields_gathered <-
                                        final_field_value == "Developmental and Educational Psychology" ~ "Developmental and\nEducational Psychology",
                                        TRUE ~ final_field_value))
 
+fields_gathered %>% 
+  count(final_field_value) %>% 
+  arrange(desc(n)) %>% 
+  mutate(N = sum(n))
+  
 fields_plot <-
   fields_gathered %>% 
-  count(final_field_value) %>% 
+  count(final_field_value) %>%
   mutate(
     final_field_value = forcats::fct_reorder(final_field_value, n, .desc = FALSE),
     final_field_value = forcats::fct_relevel(final_field_value, "Other", after = 0)) %>% 

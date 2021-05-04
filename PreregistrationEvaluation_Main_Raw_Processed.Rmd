@@ -67,17 +67,46 @@ filtered_data <- raw_data %>%
 filtered_data %>% 
   count(group)
 
+nrow(raw_data)
+
+raw_data %>% 
+  count(group)
+
+# How many respondents were excluded because of not finished?
+raw_data %>% 
+  filter(finished == "True",
+         progress == "100") %>% 
+  nrow()
+
+# Not agreeing to the consent form
+raw_data %>% 
+  filter(finished == "True",
+         progress == "100",
+         informed_consent == "Yes") %>% 
+  nrow()
+
 # How many respondents do we have from all the groups?
 raw_data %>% 
   filter(finished == "True",
          progress == "100",
          informed_consent == "Yes",
          group == "control" & control_attention == "4\nFour" | group == "prereg" & prereg_attention == "4\nFour" | group == "other" & other_attention == "4\nFour") %>% 
-  count(group)
+  nrow()
+
+raw_data %>% 
+  filter(finished == "True",
+         progress == "100",
+         informed_consent == "Yes",
+         group == "control" & control_attention == "4\nFour" | group == "prereg" & prereg_attention == "4\nFour" | group == "other" & other_attention == "4\nFour") %>% 
+  filter(group %in% group_interest) %>% 
+  nrow()
 
 # How many respondents do we have from each research type?
 filtered_data %>% 
   count(research_type)
+
+filtered_data %>% 
+  count(group)
 ```
 
 # Removing irrelevant variables

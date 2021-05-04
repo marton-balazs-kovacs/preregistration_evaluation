@@ -107,6 +107,7 @@ likert_plot_odd <- function(data_sum, vars, limits = c(-0.5, 1), text_push = 0.1
       stat = "identity"
     ) +
     coord_flip()  +
+    labs(y = "Percentage") +
     geom_hline(yintercept = 0, color = 'white', size = 1) +
     guides(fill = guide_legend(reverse = TRUE)) +
     scale_fill_identity(
@@ -130,34 +131,33 @@ likert_plot_odd <- function(data_sum, vars, limits = c(-0.5, 1), text_push = 0.1
     geom_text(
       data = label_data$negative, 
       aes(label = label, x = groups,  y = textloc), 
-      hjust = 0, color = "grey50", size = 6) +
+      hjust = 0, color = "grey50", size = 10) +
     geom_text(
       data = label_data$positive,
       aes(label = label, x = groups,  y = textloc), 
-      hjust = 1, color = "grey50", size = 6)  +
+      hjust = 1, color = "grey50", size = 10)  +
     geom_text(
       data = label_data$neutral,
       aes(label = label, x = groups,  y = textloc), 
-      hjust = .5, color = "grey50", size = 6) +
+      hjust = .5, color = "grey50", size = 10) +
     scale_y_continuous(
       expand = c(0, 0),
       limits = limits,
       breaks = breaks,
       labels = labels) +
     theme(
-      title = element_text(size = 20),
-      axis.title.x = element_blank(),
+      title = element_text(size = 30),
       axis.title.y = element_blank(),
       panel.background = element_blank(),
       panel.grid = element_blank(),
-      axis.text = element_text(size = 15),
-      axis.title = element_text(size = 25),
+      axis.text = element_text(size = 25),
+      axis.title = element_text(size = 30),
       axis.ticks = element_blank(),
       strip.background = element_blank(),
-      strip.text = element_text(hjust = 0, face = 'bold', size = 25),
+      strip.text = element_text(hjust = 0, face = 'bold', size = 30),
       panel.border = element_rect(color = 'gray90', linetype = "dashed", fill = NA),
       legend.key.size = unit(1, 'cm'),
-      legend.text = element_text(size = 15))
+      legend.text = element_text(size = 20))
   
   # Return output
   return(likert_plot)
