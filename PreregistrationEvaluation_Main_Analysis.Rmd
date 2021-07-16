@@ -13,7 +13,7 @@ editor_options:
 
 ```{r, message = FALSE, warning = FALSE}
 library(tidyverse)
-library(jaspGraphs)
+# library(jaspGraphs)
 ```
 
 # Source R scripts
@@ -137,7 +137,7 @@ papaja::apa_table(
 )
 ```
 
-For the intervall type questions we will calculate the mean and SD for each question per group. We will also present the results in a table.
+For the interval type questions we will calculate the mean and confidence intervals for each question per group. We will also present the results in a table.
 
 ```{r}
 # Get the id of the questions
@@ -157,7 +157,11 @@ interval_survey_questions_table <-
   group_by(group, vars) %>% 
   summarise(Mean = round(mean(values, na.rm = TRUE), 2),
             SD = round(sd(values, na.rm = TRUE), 2),
-            N = n()) %>% 
+            N = n(),
+            SE = SD / sqrt(N),
+            ub = round(Mean + 1.96 * SE, 2),
+            lb = round(Mean - 1.96 * SE, 2),
+            `Confidence interval` = paste0("[", lb, ", ", ub, "]")) %>% 
   mutate(group = groups_rename(group)) %>% 
   arrange(vars, group) %>% 
   rename(`Survey question` = vars,
