@@ -1,0 +1,400 @@
+---
+title: "PreregistrationEvaluation_Main_Sample"
+author: "Marton Kovacs"
+date: 'r format(Sys.time(), "%d %B, %Y")`'
+output: html_document
+---
+
+# Load packages
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(stringi)
+```
+
+# Prereg group sample selection
+# Import data
+
+```{r}
+email_database <- read_xlsx("Data/PreregistrationEvaluation_ContactDatabase.xlsx", sheet = "prereg")
+```
+
+# Variable transformation
+
+```{r}
+email_database <-
+  email_database %>% 
+  mutate(number_of_names = stri_count_fixed(corresponding_author, " "),
+         first_name = stri_extract_first(corresponding_author, regex = "\\w+"),
+         last_name = stri_extract_last(corresponding_author, regex = "\\w+"),
+         contains_osf_aspredicted = case_when(str_detect(prereg_link1, pattern = "osf") ~ 1L,
+                                              str_detect(prereg_link1, pattern = "aspredicted") ~ 1L,
+                                              str_detect(link2, pattern = "osf") ~ 1L,
+                                              str_detect(link2, pattern = "aspredicted") ~ 1L,
+                                              str_detect(link3, pattern = "osf") ~ 1L,
+                                              str_detect(link3, pattern = "aspredicted") ~ 1L,
+                                              TRUE ~ 0L),
+         email = tolower(email))
+```
+
+# Source of the studies
+
+```{r}
+email_database %>% 
+  count(source)
+```
+
+# Count the number of rows
+
+```{r}
+nrow(email_database)
+```
+
+# EDA
+
+Check if there are only distinct type of links to the papers and distinct titles.
+
+```{r}
+email_database %>% 
+  count(link) %>% 
+  filter(n != 1)
+# There is one double link but that leads to the volume and not a specific paper so it is fine.
+
+email_database %>% 
+  count(title) %>% 
+  filter(n != 1)
+```
+
+# Filtering
+
+Checking the distinct values of the platform variable.
+
+```{r}
+email_database %>% 
+  distinct(platform)
+
+email_database %>% 
+  count(platform)
+```
+
+We keep only preregistration where there is an available link to the preregistration on OSF or aspredicted.
+
+```{r}
+email_database <-
+  email_database %>%
+  filter(contains_osf_aspredicted == 1L)
+```
+
+Checking the distinct values of prereg types.
+
+```{r}
+email_database %>% 
+  distinct(type)
+```
+
+Dropping Registered Reports.
+
+```{r}
+email_database <-
+  email_database %>%
+  filter(type != "RR")
+```
+
+Dropping cases where the name of the author is not known.
+
+```{r}
+email_database <-
+  email_database %>%
+  filter(!is.na(corresponding_author))
+
+nrow(email_database)
+```
+
+Keeping just one from all authors.
+
+```{r}
+email_database <-
+  email_database %>%
+  distinct(corresponding_author, .keep_all = T)
+```
+
+Drop cases where the email address is missing.
+
+```{r}
+email_database <-
+  email_database %>%
+  filter(!is.na(email))
+```
+
+Arrange contacts by last name and email address.
+
+```{r}
+email_database <-
+  email_database %>%
+  arrange(last_name, email)
+```
+
+# Write database witouth email addresses
+
+```{r}
+email_database %>% 
+  select(-email, -contains_osf_aspredicted, -number_of_names) %>% 
+  write_xlsx(., "Data/Sample/PreregistrationEvaluation_Prereg_Filtered_ContactDatabase.xlsx")
+```
+
+# Select needed variables
+
+```{r}
+email_database <-
+  email_database %>%
+  select(email, first_name, last_name)
+```
+
+# Write first batch
+
+```{r}
+email_database %>% 
+  slice(1:50) %>%
+  write_xlsx(., "Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch1.xlsx")
+```
+
+# Write second batch
+
+```{r}
+email_database %>% 
+  slice(51:487) %>%
+  write_xlsx(., "Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch2.xlsx")
+```
+
+# Checking the samples
+
+```{r}
+prereg_batch_1 <- read_xlsx("Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch1.xlsx")
+
+prereg_batch_2 <- read_xlsx("Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch2.xlsx")
+
+prereg_batch_3 <- read_xlsx("Data/Sample/Prereg/PreregistrationEvaluation_Sample_Batch3.xlsx")
+
+prereg_sample <- bind_rows(prereg_batch_1, prereg_batch_2, prereg_batch_3)
+
+anti_join(email_database, prereg_sample)
+# In all the 5 cases a non match is present because the email address was changed in the sample
+
+anti_join(prereg_sample, email_database)
+# The same as before
+```
+
+# Control group sample selection
+## Import data
+
+```{r}
+email_database_control <- read_xlsx("Data/PreregistrationEvaluation_ContactDatabase.xlsx", sheet = "control")
+```
+
+## Exploring the database
+
+We run a general check on the control database to make sure that columns that should have not changed stayed correctly formatted.
+
+```{r}
+email_database_control %>% 
+  count(prereg_article_id_unique)
+
+email_database_control %>%
+  summarise(sum = sum(prereg_article_id_unique))
+```
+
+## Data cleaning
+### Filtering
+
+We have collected and checked the email addresses for two control researchers. We have sent out invitations to participate in the study in two batches.
+
+```{r}
+email_database_control_first <-
+  email_database_control %>%
+  filter(prereg_article_id_unique %in% c(1, 2))
+```
+
+Later on we have collected and checked the email addresses of three more control researchers per preregistered article. We have sent out the invitation to participate to these researchers in one batch.
+
+```{r}
+email_database_control_second <-
+  email_database_control %>%
+  filter(prereg_article_id_unique %in% c(3, 4, 5))
+```
+
+### Check how many email addresses do we have for each control id
+
+```{r}
+email_database_control_second %>% 
+  mutate(missing_control_mail = case_when(is.na(control_author_mail) ~ 1L,
+                                          !is.na(control_author_mail) | control_author_mail == "nomail" ~ 0L)) %>% 
+  group_by(prereg_article_id_unique, missing_control_mail) %>% 
+  count()
+```
+
+## Check how many times a prereg group author is listed?
+
+It should be maximum 2, as we collect 2 email addresses for each author who preregistered. Irrespective of the number of preregistered and published articles from her in our database.
+
+```{r}
+email_database_control_first %>% 
+  group_by(prereg_article_id) %>% 
+  count() %>%
+  arrange(desc(n)) %>% 
+  filter(n != 2)
+```
+
+For the second collection it should be three.
+
+```{r}
+email_database_control_second %>% 
+  group_by(prereg_article_id) %>% 
+  count() %>%
+  arrange(desc(n)) %>% 
+  filter(n != 3)
+```
+
+## Count the number of prereg authors
+
+```{r}
+email_database_control_first %>% 
+  distinct(prereg_article_id) %>%
+  count()
+
+email_database_control_second %>% 
+  distinct(prereg_article_id) %>%
+  count()
+```
+
+### Drop NA emails
+
+We drop all the rows where the control author has missing email address or it is flagged with nomail.
+
+```{r}
+email_database_control_second <-
+  email_database_control_second %>%
+  filter(!is.na(control_author_mail),
+         control_author_mail != "nomail")
+```
+
+## Count the number of control mails
+
+Duplicates can change this count.
+
+```{r}
+email_database_control_second %>% 
+  count()
+```
+
+## Count the number of distinct control mails
+
+Duplicates are excluded.
+
+```{r}
+email_database_control_second %>%
+  distinct(control_author_mail) %>% 
+  count()
+```
+
+## Check the duplicate control mails
+
+```{r}
+email_database_control_second %>% 
+  group_by(control_author_mail) %>% 
+  mutate(num_of_occurence = row_number()) %>% 
+  filter(num_of_occurence > 1) %>% 
+  ungroup() %>% 
+  count()
+```
+
+# Filtering
+
+Dropping cases where the name of the author is not known.
+
+```{r}
+email_database_control_second %>%
+  filter(is.na(control_corresponding_author)) %>% 
+  count()
+
+email_database_control_second <-
+  email_database_control_second %>%
+  filter(!is.na(control_corresponding_author))
+```
+
+Dropping duplicates.
+
+```{r}
+email_database_control_second <-
+  email_database_control_second %>%
+  distinct(control_author_mail, .keep_all = T)
+```
+
+Keeping only valid email addresses.
+
+```{r}
+email_database_control_second <-
+  email_database_control_second %>%
+  filter(is_valid == 1,
+         !is.na(is_valid))
+```
+
+We drop those email addresses from the second collection that are present in the first collection as well.
+
+```{r}
+email_database_control_second <- 
+  email_database_control_second %>% 
+  anti_join(., select(email_database_control_first, control_author_mail), by = "control_author_mail")
+```
+
+# Variable transformation
+
+```{r}
+email_database_control_second <-
+  email_database_control_second %>% 
+  mutate(number_of_names = stri_count_fixed(control_corresponding_author, " ") + 1,
+         control_corresponding_author = str_remove(control_corresponding_author, "Dr. "),
+         last_name = stri_extract_last(control_corresponding_author, regex = "\\S+"),
+         email = tolower(control_author_mail))
+```
+
+I some cases before sending out the invitation we changed some email addresses or deleted them as we found out later that the email address s not valid. Therefore, we read these modified batches and delete matching email addresses with the second batch again.
+
+```{r}
+control_batch_1 <- read_xlsx("Data/Sample/Control/PreregistrationEvaluation_Sample_Control_Batch1.xlsx")
+control_batch_2 <- read_xlsx("Data/Sample/Control/PreregistrationEvaluation_Sample_Control_Batch2.xlsx")
+```
+
+```{r}
+email_database_control_second <- 
+  email_database_control_second %>%
+  anti_join(., select(control_batch_1, email), by = c("email"))
+
+email_database_control_second <- 
+  email_database_control_second %>%
+  anti_join(., select(control_batch_2, email), by = c("email"))
+```
+
+I will check the last names and complete them by hand when it is needed.
+
+# Select and arrange needed variables
+
+```{r}
+email_database_control_second <-
+  email_database_control_second %>%
+  arrange(last_name, email)
+```
+
+```{r}
+email_database_control_second <-
+  email_database_control_second %>%
+  select(email, control_corresponding_author, last_name)
+```
+
+# Write batch
+
+```{r}
+email_database_control_second %>% 
+  write_xlsx(., "Data/Sample/Control/PreregistrationEvaluation_Sample_Control_Batch3.xlsx")
+```

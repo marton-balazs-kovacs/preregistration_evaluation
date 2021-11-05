@@ -3,6 +3,6 @@
 .RData
 .Ruserdata
 credentials.json
-Data/Sample/
-Data/Main/Source
-Data/PreregistrationEvaluation_ContactDatabase.xlsx
+data/sample/
+data/main/source
+data/PreregistrationEvaluation_ContactDatabase.xlsx
