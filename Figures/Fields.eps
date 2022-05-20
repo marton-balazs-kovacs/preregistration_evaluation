@@ -54,48 +54,11 @@
            >>
          ] setcolorspace } bind def
 /srgb { setcolor } bind def
-% begin encoding
-/WinAnsiEncoding [
- /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef
- /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef
- /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef
- /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef
- /space /exclam /quotedbl /numbersign /dollar /percent /ampersand /quoteright
- /parenleft /parenright /asterisk /plus /comma /minus /period /slash
- /zero /one /two /three /four /five /six /seven
- /eight /nine /colon /semicolon /less /equal /greater /question
- /at /A /B /C /D /E /F /G
- /H /I /J /K /L /M /N /O
- /P /Q /R /S /T /U /V /W
- /X /Y /Z /bracketleft /backslash /bracketright /asciicircum /underscore
- /grave /a /b /c /d /e /f /g
- /h /i /j /k /l /m /n /o
- /p /q /r /s /t /u /v /w
- /x /y /z /braceleft /bar /braceright /asciitilde /.notdef
- /Euro /.notdef /quotesinglbase /florin /quotedblbase /ellipsis /dagger /daggerdbl
- /circumflex /perthousand /Scaron /guilsinglleft /OE /.notdef /Zcaron /.notdef
- /.notdef /quoteleft /quoteright /quotedblleft /quotedblright /bullet /endash /emdash
- /tilde /trademark /scaron /guilsinglright /oe /.notdef /zcaron /Ydieresis
- /space /exclamdown /cent /sterling /currency /yen /brokenbar /section
- /dieresis /copyright /ordfeminine /guillemotleft /logicalnot /hyphen /registered /macron
- /degree /plusminus /twosuperior /threesuperior /acute /mu /paragraph /periodcentered
- /cedilla /onesuperior /ordmasculine /guillemotright /onequarter /onehalf /threequarters /questiondown
- /Agrave /Aacute /Acircumflex /Atilde /Adieresis /Aring /AE /Ccedilla
- /Egrave /Eacute /Ecircumflex /Edieresis /Igrave /Iacute /Icircumflex /Idieresis
- /Eth /Ntilde /Ograve /Oacute /Ocircumflex /Otilde /Odieresis /multiply
- /Oslash /Ugrave /Uacute /Ucircumflex /Udieresis /Yacute /Thorn /germandbls
- /agrave /aacute /acircumflex /atilde /adieresis /aring /ae /ccedilla
- /egrave /eacute /ecircumflex /edieresis /igrave /iacute /icircumflex /idieresis
- /eth /ntilde /ograve /oacute /ocircumflex /otilde /odieresis /divide
- /oslash /ugrave /uacute /ucircumflex /udieresis /yacute /thorn /ydieresis
-]
- def
-% end encoding
 %%IncludeResource: font Helvetica
 /Helvetica findfont
 dup length dict begin
   {1 index /FID ne {def} {pop pop} ifelse} forall
-  /Encoding WinAnsiEncoding def
+  /Encoding ISOLatin1Encoding def
   currentdict
   end
 /Font1 exch definefont pop
@@ -103,7 +66,7 @@ dup length dict begin
 /Helvetica-Bold findfont
 dup length dict begin
   {1 index /FID ne {def} {pop pop} ifelse} forall
-  /Encoding WinAnsiEncoding def
+  /Encoding ISOLatin1Encoding def
   currentdict
   end
 /Font2 exch definefont pop
@@ -111,7 +74,7 @@ dup length dict begin
 /Helvetica-Oblique findfont
 dup length dict begin
   {1 index /FID ne {def} {pop pop} ifelse} forall
-  /Encoding WinAnsiEncoding def
+  /Encoding ISOLatin1Encoding def
   currentdict
   end
 /Font3 exch definefont pop
@@ -119,7 +82,7 @@ dup length dict begin
 /Helvetica-BoldOblique findfont
 dup length dict begin
   {1 index /FID ne {def} {pop pop} ifelse} forall
-  /Encoding WinAnsiEncoding def
+  /Encoding ISOLatin1Encoding def
   currentdict
   end
 /Font4 exch definefont pop
@@ -154,24 +117,23 @@ bp
 10.00 setmiterlimit
 0.00 0.00 1275.59 708.66 r p3
 0.00 0.00 1275.59 708.66 cl
-237.28 72.10 1269.61 702.68 cl
-/bg { 0.3490 0.3490 0.3490 srgb } def
-237.28 288.01 119.12 61.69 r p2
-237.28 219.46 95.29 61.69 r p2
-237.28 493.63 285.88 61.69 r p2
-237.28 562.17 825.87 61.69 r p2
-237.28 150.92 31.76 61.69 r p2
-237.28 356.55 135.00 61.69 r p2
-237.28 82.38 452.64 61.69 r p2
-237.28 425.09 254.11 61.69 r p2
-237.28 630.71 889.40 61.69 r p2
-0.8980 0.8980 0.8980 srgb
-1.16 setlinewidth
-[ 3.49 5.82] 0 setdash
-1 setlinecap
-1 setlinejoin
+297.03 76.79 1269.61 702.68 cl
+/bg { 0.8980 0.8980 0.8980 srgb } def
+0 0 0 srgb
+1.07 setlinewidth
+[] 0 setdash
+2 setlinecap
+0 setlinejoin
 10.00 setmiterlimit
-237.28 72.10 1032.34 630.59 r p1
+297.03 291.09 112.22 61.23 r p3
+297.03 223.06 89.78 61.23 r p3
+297.03 495.19 269.33 61.23 r p3
+297.03 563.22 778.07 61.23 r p3
+297.03 155.02 29.93 61.23 r p3
+297.03 359.12 127.18 61.23 r p3
+297.03 86.99 426.44 61.23 r p3
+297.03 427.15 239.41 61.23 r p3
+297.03 631.25 837.92 61.23 r p3
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
@@ -192,33 +154,33 @@ bp
 1 setlinejoin
 10.00 setmiterlimit
 np
-237.28 72.10 m
-0 630.58 l
+297.03 76.79 m
+0 625.89 l
 o
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
-/Font1 findfont 15 s
+/Font1 findfont 20 s
 0.3020 0.3020 0.3020 srgb
-225.32 107.84 (Other) 1 0 t
-225.32 176.38 (Methodology and Statistics) 1 0 t
-225.32 244.92 (Clinical Psychology) 1 0 t
-225.32 313.46 (Applied Psychology) 1 0 t
-84.43 390.11 (Neuroph) 0 ta
--0.450 (ysiology and) tb gr
-56.93 373.91 (Ph) 0 ta
--0.450 (ysiological Psychology) tb gr
-70.27 450.55 (P) 0 ta
--0.750 (ersonality Psychology) tb gr
-96.10 527.19 (De) 0 ta
--0.450 (v) tb
--0.375 (elopmental and) tb gr
-225.32 510.99 (Educational Psychology) 1 0 t
-108.61 595.73 (Exper) 0 ta
-0.225 (imental and) tb gr
-81.94 579.53 (Cognitiv) 0 ta
--0.375 (e Psychology) tb gr
-225.32 656.17 (Social Psychology) 1 0 t
+285.07 110.43 (Other) 1 0 t
+285.07 178.46 (Methodology and Statistics) 1 0 t
+285.07 246.49 (Clinical Psychology) 1 0 t
+285.07 314.52 (Applied Psychology) 1 0 t
+97.21 393.36 (Neuroph) 0 ta
+-0.600 (ysiology and) tb gr
+60.55 371.76 (Ph) 0 ta
+-0.600 (ysiological Psychology) tb gr
+78.33 450.59 (P) 0 ta
+-1.000 (ersonality Psychology) tb gr
+112.77 529.42 (De) 0 ta
+-0.600 (v) tb
+-0.500 (elopmental and) tb gr
+285.07 507.82 (Educational Psychology) 1 0 t
+129.45 597.45 (Exper) 0 ta
+0.300 (imental and) tb gr
+93.89 575.85 (Cognitiv) 0 ta
+-0.500 (e Psychology) tb gr
+285.07 654.68 (Social Psychology) 1 0 t
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
@@ -235,22 +197,22 @@ o
 1 setlinejoin
 10.00 setmiterlimit
 np
-237.28 72.10 m
-1032.33 0 l
+297.03 76.79 m
+972.58 0 l
 o
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
-/Font1 findfont 15 s
+/Font1 findfont 20 s
 0.3020 0.3020 0.3020 srgb
-237.28 49.37 (0) .5 0 t
-435.80 49.37 (25) .5 0 t
-634.33 49.37 (50) .5 0 t
-832.86 49.37 (75) .5 0 t
-1031.38 49.37 (100) .5 0 t
-1229.91 49.37 (125) .5 0 t
+297.03 50.47 (0) .5 0 t
+484.06 50.47 (25) .5 0 t
+671.10 50.47 (50) .5 0 t
+858.13 50.47 (75) .5 0 t
+1045.17 50.47 (100) .5 0 t
+1232.21 50.47 (125) .5 0 t
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
@@ -259,14 +221,12 @@ o
 0.00 0.00 1275.59 708.66 cl
 /Font1 findfont 30 s
 0 0 0 srgb
-600.90 12.58 (Number of P) 0 ta
--1.200 (ar) tb
-1.200 (ticipants) tb gr
+783.32 12.58 (Number of Respondents) .5 0 t
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 /Font1 findfont 30 s
 0 0 0 srgb
-27.52 387.39 (Fields) .5 90 t
+27.52 389.74 (Research Background) .5 90 t
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
 0.00 0.00 1275.59 708.66 cl
