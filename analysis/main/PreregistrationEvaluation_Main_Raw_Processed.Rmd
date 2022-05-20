@@ -195,3 +195,77 @@ writexl::write_xlsx(challenges, here::here("data/main/processed/PreregistrationE
 ```{r export}
 write_tsv(tidy_data, here::here("data/main/processed/PreregistrationEvaluation_Main_Processed.tsv"))
 ```
+
+
+# Detailed Insights in the Groups
+
+```{r detailed_insights}
+# Filtering data
+filtered_data <- raw_data %>% 
+  filter(finished == "True",
+         progress == "100",
+         informed_consent == "Yes",
+         control_attention == "4\nFour" | prereg_attention == "4\nFour" | other_attention == "4\nFour"
+         )
+
+# group_sorting 1 = Preregistered study that is not published
+# group_sorting 2 = Preregistered study that is published
+# group_sorting 3 = Published study that is neither preregistered nor a Registered Report
+# group_sorting 4 = Registered Report that is not published
+# group_sorting 5 = Registered Report that is published
+group_details <- filtered_data %>% 
+  select(group, group_sorting_1, group_sorting_2, group_sorting_3, group_sorting_4, group_sorting_5)
+group_details[group_details == "No"]  <- "0"
+group_details[group_details == "Yes"] <- "1"
+group_details[, -1] <- apply(group_details[, -1], 2, as.numeric)
+
+group_details_ctrl   <- as.data.frame(group_details[group_details$group == 'control', ])
+group_details_prereg <- as.data.frame(group_details[group_details$group == 'prereg', ])
+group_details_other  <- as.data.frame(group_details[group_details$group == 'other', ])
+
+#nrow(group_details_ctrl); colSums(group_details_ctrl[,-1]); colMeans(group_details_ctrl[,-1])
+#nrow(group_details_prereg); colSums(group_details_prereg[,-1]); colMeans(group_details_prereg[,-1])
+#nrow(group_details_other); colSums(group_details_other[,-1]); colMeans(group_details_other[,-1])
+```
+
+No researchers in the control group preregistered a study that was not published or had experience with writing a Registered Report. From the `r nrow(group_details_prereg)` researchers in the preregistration group, all researchers published a preregistered and non-preregistered study. Furthermore, `r sum(group_details_prereg$group_sorting_1)` indicated that they had preregistered a study that was not published. Here it is unclear whether the authors have difficulties publishing the preregistered study or whether they were referring to an ongoing project. `r sum(group_details_prereg$group_sorting_4)` researchers have worked on a Registered report that has not been published and
+`r sum(group_details_prereg$group_sorting_5)` researchers have worked on a Registered report that had been published.
+
+# Saving Data from 'Other' Group
+
+```{r others}
+# Filtering data
+other_data <- raw_data %>% 
+  filter(finished == "True",
+         progress == "100",
+         informed_consent == "Yes",
+         group == "other" & other_attention == "4\nFour")
+
+other_data <- other_data %>% 
+  select(response_id, duration_in_seconds,group_sorting_1:group_sorting_5, other_hypothesis:other_qrp, planning:changed_comment, -control_attention, -prereg_attention, -other_attention)
+
+other_data <- 
+  other_data %>% 
+  # Gather all the columns with "other_" prefix
+  pivot_longer(
+    cols = contains("other_"),
+    names_to = "variable_names",
+    values_to = "values"
+  ) %>% 
+  # Response was forced so all NA values mean that the participant was not member of that group
+  # So we can drop them
+  drop_na(values) %>% 
+  # Delete prefix and convert character variables to numeric
+  mutate(variable_names = str_remove(variable_names, "other_")) %>% 
+  # Spread gathered columns to make the datatable tidy
+  pivot_wider(
+    names_from = variable_names,
+    values_from = values
+  )
+colnames(other_data)[colnames(other_data) == 'desing'] <- 'design'
+
+# Export Other Data
+write_tsv(other_data, here::here("data/main/processed/PreregistrationEvaluation_Others_Processed.tsv"))
+```
+
+From the `r nrow(other_data)` respondents who were assigned neither to the preregistered group nor to the non-preregistered, `r sum(other_data$group_sorting_1 == 'Yes' & other_data$group_sorting_2 == 'No' & other_data$group_sorting_5 == 'No')` indicated that they made experience with preregistration but have not (yet) published a preregistration. Out of this subgroup, `r sum(other_data$group_sorting_4 == 'Yes' | other_data$group_sorting_5 == 'Yes')` researchers reported having made experience with Registered Reports, with `r sum(other_data$group_sorting_5 == 'Yes')` having published at least one. For consistency, we again exclude all respondents who have experience with Registered Reports, leaving a sample of `r sum(other_data$group_sorting_1 == 'Yes' & other_data$group_sorting_2 == 'No' & other_data$group_sorting_4 == 'No' & other_data$group_sorting_5 == 'No')` respondents. 

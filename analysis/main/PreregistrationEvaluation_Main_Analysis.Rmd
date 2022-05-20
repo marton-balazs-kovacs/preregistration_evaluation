@@ -14,19 +14,24 @@ editor_options:
 ```{r, message = FALSE, warning = FALSE}
 library(tidyverse)
 library(ragg)
+library(here)
+library(purrr)
+library(readr)
+library(tidyr)
 ```
 
 # Source R scripts
 
 ```{r}
+# setwd("~/Git_projects/preregistration_survey/analysis/main")
 r_scripts <- list.files(here::here("R/"), full.names = TRUE)
-walk(r_scripts, source)
+purrr::walk(r_scripts, source)
 ```
 
 # Importing data
 
 ```{r, message = FALSE}
-processed <- read_tsv(here::here("data/main/processed/PreregistrationEvaluation_Main_Processed.tsv"))
+processed <- readr::read_tsv(here::here("data/main/processed/PreregistrationEvaluation_Main_Processed.tsv"))
 ```
 
 # Descriptives
@@ -102,9 +107,30 @@ survey_questions <-
                                   var_name = .y,
                                   group_var = group,
                                   factor_group = .x)))
-```
 
-Create one table out of nested information with more descriptive variable and question names. We will create this table only for the Likert-type questions.
+survey_questions_table_interval <- 
+  survey_questions %>% 
+  filter(type == "interval") %>%
+  select(vars, groups, var_desc) %>% 
+  unnest(var_desc) %>% 
+  dplyr::group_by(groups, vars) %>% 
+  dplyr::mutate(N = sum(n))%>% 
+                #,prop = round(n / N * 100, 2)) %>% 
+  select(-N, -levels_int) %>% 
+  mutate(vars = vars_rename(vars),
+         groups = groups_rename(groups)) %>% 
+  arrange(vars, desc(groups)) %>% 
+  rename(Aspect = vars,
+         Group = groups,
+         Levels = levels,
+         NrResponses = n,
+         #`Proportion of the level` = prop
+         )
+
+
+survey_interval <- survey_questions_table_interval[survey_questions_table_interval$Levels == 'I do not know' | survey_questions_table_interval$Levels == 'Not applicable', ]
+survey_interval <- reshape( as.data.frame(survey_interval), idvar = c("Aspect", "Group"), timevar = c('Levels'), direction="wide")
+```
 
 
 ```{r}
@@ -125,9 +151,10 @@ survey_questions_table <-
          Levels = levels,
          `Number of responses` = n,
          `Proportion of the level` = prop)
+as.data.frame(survey_questions_table[survey_questions_table$Levels == 'I do not know', ])
+as.data.frame(survey_questions_table[survey_questions_table$Levels == 'Not applicable', ])
 ```
 
-Create an APA formatted table for the paper.
 
 ```{r}
 papaja::apa_table(
@@ -161,10 +188,11 @@ interval_survey_questions_table <-
             SE = SD / sqrt(N),
             ub = round(Mean + 1.96 * SE, 2),
             lb = round(Mean - 1.96 * SE, 2),
-            `Confidence interval` = paste0("[", lb, ", ", ub, "]")) %>% 
+            `Confidence interval` = paste0("[", lb, ", ", ub, "]"),
+            MeanAndCI = paste(Mean, `Confidence interval`)) %>% 
   mutate(group = groups_rename(group)) %>% 
-  arrange(vars, group) %>% 
-  rename(`Survey question` = vars,
+  arrange(vars, desc(group)) %>% 
+  rename(Aspect = vars,
          Group = group)
 
 papaja::apa_table(
@@ -172,118 +200,184 @@ papaja::apa_table(
   caption = "A Full Summary of the Interval Survey Questions Per Group",
   escape = TRUE
 )
+
+
+interval_questions_short <- as.data.frame(interval_survey_questions_table)[, c('Aspect','Group','MeanAndCI')]
+interval_questions_short <- merge(interval_questions_short, survey_interval, sort = FALSE)
+papaja::apa_table(
+  interval_questions_short,
+  caption = "Summary of the Answers of each individual Aspect on the Research Workflow per Group",
+  escape = TRUE
+)
 ```
 
 We visualize the content of the table as barcharts for each question per group. These plot will not be necessarily included in the paper, but they can aid further investigation of the data.
 
-```{r}
+```{r, eval = FALSE}
 # survey_questions <-
-#   survey_questions %>% 
+#   survey_questions %>%
 #   mutate(plot = map2(groups, vars,
 #                      ~ apa_barplot(
-#                        df = processed,
 #                        group_name = .x,
+#                        group_name = .x,
+#                        df = processed,
 #                        var_name = .y,
 #                        group_var = group,
 #                        factor_group = .x)))
-# 
 # survey_questions$plot
 ```
 
 Three of the questions were using a Likert-scale. We show the proportion of the response levels as horizontal barcharts. Two of them using the same scale, therefore we show them together for practical reasons.
 
 ```{r}
+figure_width <- 50
+figure_height <- 17
+```
+
+
+```{r}
 # Get the id of the questions
 likert_plot_data_recommend <- prepare_likert_plot_data(survey_questions, "recommend")
+# Change labels
+likert_plot_data_recommend$groups[likert_plot_data_recommend$groups == 'Control'] <- 'Non-Preregistration'
+levels(likert_plot_data_recommend$levels) <- c("Very strongly\ndisagree", "2", "3", "4", "5", "6", "Very strongly\nagree", "I do not know", "Not applicable" )
 
-# Create the plot
-likert_plot_recommend <- 
-    likert_plot_odd(
-    data = likert_plot_data_recommend,
-    title = "Recommend Preregistration To Colleagues",
-    levels = levels,
-    levels_to_drop = c("I do not know", "Not applicable"),
-    questions = groups,
-    n = n,
-    positive_side = "upper",
-    limits = c(-1, 1),
-    text_push = 0.01) + 
-  theme(
-    legend.margin = margin(l = 0, b = 0, r = 100),
-    legend.key.size = unit(0.8, 'cm'),
-    legend.text = element_text(size = 19),
-    plot.margin = margin(t = 10, r = 40, b = 10, l = 0))
+# # Create the plot
+# likert_plot_recommend <- 
+#     likert_plot_odd(
+#     data = likert_plot_data_recommend,
+#     title = "''I would recommend preregistration to other researchers in my field.''",
+#     levels = levels,
+#     levels_to_drop = c("I do not know", "Not applicable"),
+#     questions = groups,
+#     n = n,
+#     positive_side = "upper",
+#     limits = c(-1, 1),
+#     text_push = 0.01) + 
+#   theme(
+#     legend.margin = margin(l = 0, b = 0, r = 100),
+#     legend.key.size = unit(0.8, 'cm'),
+#     legend.text = element_text(size = 19),
+#     plot.margin = margin(t = 10, r = 40, b = 10, l = 0))
+# 
+# likert_plot_recommend
 
-likert_plot_recommend
-
-# Save for the paper
-ggsave(here::here("figures/likert_plot_recommend.eps"), device = "eps", plot = likert_plot_recommend, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
-
-# Save for the manuscript
-ggsave(here::here("figures/likert_plot_recommend.png"), device = "png", plot = likert_plot_recommend, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+# # Save for the paper
+# ggsave(here::here("figures/likert_plot_recommend.eps"), device = "eps", plot = likert_plot_recommend, dpi = 300, width = figure_width, height = figure_height, units = "cm")
+# 
+# # Save for the manuscript
+# ggsave(here::here("figures/likert_plot_recommend.png"), device = "png", plot = likert_plot_recommend, dpi = 300, width = figure_width, height = figure_height, units = "cm")
 ```
 
 ```{r}
 # Get the id of the questions
 likert_plot_data_qrp <- prepare_likert_plot_data(survey_questions, "qrp")
+likert_plot_data_qrp$groups[likert_plot_data_qrp$groups == 'Control'] <- 'Non-Preregistration'
+levels(likert_plot_data_qrp$levels) <- c("Very strongly\ndisagree", "2", "3", "4", "5", "6", "Very strongly\nagree", "I do not know", "Not applicable" )
 
-# Create the plot
-likert_plot_qrp <- 
-    likert_plot_odd(
-    data = likert_plot_data_qrp,
-    title = "Preregistration Prevents Questionable Research Practices",
-    levels = levels,
-    levels_to_drop = c("I do not know", "Not applicable"),
-    questions = groups,
-    n = n,
-    positive_side = "upper",
-    limits = c(-1, 1),
-    text_push = 0.01) + 
-  theme(
-    legend.margin = margin(l = 0, b = 0, r = 100),
-    legend.key.size = unit(0.8, 'cm'),
-    legend.text = element_text(size = 19),
-    plot.margin = margin(t = 10, r = 40, b = 10, l = 0))
-
-likert_plot_qrp
-
-# Save for the paper
-ggsave(here::here("figures/likert_plot_qrp.eps"), device = "eps", plot = likert_plot_qrp, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
-
-# Save for the manuscript
-ggsave(here::here("figures/likert_plot_qrp.png"), device = "png", plot = likert_plot_qrp, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+# # Create the plot
+# likert_plot_qrp <- 
+#     likert_plot_odd(
+#     data = likert_plot_data_qrp,
+#     title = "''Preregistration made/would make it easier to avoid questionable\nresearch practices.''",
+#     levels = levels,
+#     levels_to_drop = c("I do not know", "Not applicable"),
+#     questions = groups,
+#     n = n,
+#     positive_side = "upper",
+#     limits = c(-1, 1),
+#     text_push = 0.01) + 
+#   theme(
+#     legend.margin = margin(l = 0, b = 0, r = 100),
+#     legend.key.size = unit(0.8, 'cm'),
+#     legend.text = element_text(size = 19),
+#     plot.margin = margin(t = 10, r = 40, b = 10, l = 0))
+# 
+# likert_plot_qrp
+# 
+# # Save for the paper
+# ggsave(here::here("figures/likert_plot_qrp.eps"), device = "eps", plot = likert_plot_qrp, dpi = 300, width = figure_width, height = figure_height, units = "cm")
+# 
+# # Save for the manuscript
+# ggsave(here::here("figures/likert_plot_qrp.png"), device = "png", plot = likert_plot_qrp, dpi = 300, width = figure_width, height = figure_height, units = "cm")
 ```
 
 ```{r}
 # Get the id of the questions
 likert_plot_data_planning <- prepare_likert_plot_data(survey_questions, "planning")
+likert_plot_data_planning$groups[likert_plot_data_planning$groups == 'Control'] <- 'Non-Preregistration'
 
-# Create the plot
-likert_plot_planning <-
-  likert_plot_odd(
-    data = likert_plot_data_planning,
-    title = "Consider Preregistration in Future Work",
-    levels = levels,
-    levels_to_drop = c("I do not know", "Not applicable"),
-    questions = groups,
-    n = n,
-    positive_side = "upper",
-    limits = c(-1, 1),
-    text_push = 0.01) + 
-  theme(
-    legend.margin = margin(l = 0, b = 0, r = 0),
-    legend.key.size = unit(0.8, 'cm'),
-    legend.text = element_text(size = 19),
-    plot.margin = margin(t = 10, r = 40, b = 10, l = 0))
-  
-likert_plot_planning
+# # Create the plot
+# likert_plot_planning <-
+#   likert_plot_odd(
+#     data = likert_plot_data_planning,
+#     title = "''How often are you planning to preregister your empirical studies\nin the future?''",
+#     levels = levels,
+#     levels_to_drop = c("I do not know", "Not applicable"),
+#     questions = groups,
+#     n = n,
+#     positive_side = "upper",
+#     limits = c(-1, 1),
+#     text_push = 0.01) + 
+#   theme(
+#     legend.margin = margin(l = 0, b = 0, r = 0),
+#     legend.key.size = unit(0.8, 'cm'),
+#     legend.text = element_text(size = 19),
+#     plot.margin = margin(t = 10, r = 40, b = 10, l = 0))
+#   
+# likert_plot_planning
+# 
+# # Save for the paper
+# ggsave(here::here("figures/likert_plot_planning.eps"), device = "eps", plot = likert_plot_planning, dpi = 300, width = figure_width, height = figure_height, units = "cm")
+# 
+# # Save for the manuscript
+# ggsave(here::here("figures/likert_plot_planning.png"), device = "png", plot = likert_plot_planning, dpi = 300, width = figure_width, height = figure_height, units = "cm")
+```
+
+```{r new_likert_plots}
+likert_plot_qrp <- 
+likert_plot_new(likert_plot_data_qrp, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"Preregistration made/would make it easier to avoid questionable\nresearch practices."', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = FALSE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend1 <- cowplot::get_legend(likert_plot_qrp + theme(legend.position = c(0.5,0.5)))
+
+likert_plot_recommend <- 
+likert_plot_new(likert_plot_data_recommend, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"I would recommend preregistration to other researchers in my field."', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = FALSE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend2 <- cowplot::get_legend(likert_plot_recommend + theme(legend.position = c(0.5,0.5)))
+
+likert_plot_planning <- 
+likert_plot_new(likert_plot_data_planning, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"How often are you planning to preregister your empirical studies\nin the future?"', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = TRUE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend3 <- cowplot::get_legend(likert_plot_planning + theme(legend.position = c(0.5,0.5)))
+
+likert_plots <- 
+cowplot::plot_grid(likert_plot_qrp, legend1,
+                   likert_plot_recommend, legend2,
+                   likert_plot_planning, legend3,
+                   ncol=2,nrow=3, rel_widths = c(1,.2), rel_heights = c(.7,.7,.7))
 
 # Save for the paper
-ggsave(here::here("figures/likert_plot_planning.eps"), device = "eps", plot = likert_plot_planning, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+ggsave(here::here("figures/all_likert_plots.eps"), device = "eps", plot = likert_plots, dpi = 500, width = 35, height = 25, units = "cm")
 
 # Save for the manuscript
-ggsave(here::here("figures/likert_plot_planning.png"), device = "png", plot = likert_plot_planning, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+ggsave(here::here("figures/all_likert_plots.png"), device = "png", plot = likert_plots, dpi = 500, width = 35, height = 25, units = "cm")
 ```
+
 
 The other questions were using a 7 point scale that we will treat as an interval scale. This plot presents the mean rating per question per group with the 95% CI as the errorbar.
 
@@ -383,7 +477,7 @@ interval_plot <-
   scale_y_continuous(
     expand = c(0, 0.4),
     breaks = c(1, 2, 3, 4, 5, 6, 7),
-    labels = c("1\nDisadvantage", "2", "3", "4", "5", "6", "7\nAdvantage")) +
+    labels = c("1\n\nDisadvantage", "2", "3", "4", "5", "6", "7\n\nAdvantage")) +
   # Redrawing the axes
   geom_segment(
     aes(x = 1, xend = 9, y = -Inf, yend = -Inf)) +
@@ -393,10 +487,7 @@ interval_plot <-
   coord_flip(ylim = c(1, 7)) +
   # Add labels
   labs(x = "Aspect of Research",
-       y = "Mean Rating",
-       fill = "Experience with\nPreregistration") +
-  # Change legend text order
-  guides(fill = guide_legend(reverse = TRUE)) +
+       y = "Mean Rating") +
   # Theme options
   papaja::theme_apa() +
   theme(axis.title = element_text(size = 22),
@@ -408,17 +499,21 @@ interval_plot <-
         axis.line = element_blank(),
         legend.text = element_text(size = 20),
         legend.title = element_text(size = 22),
-        legend.position = c(.2, .8)
-        )
+        legend.position = c(.2, .8),
+        legend.direction = "horizontal"
+        ) +
+  guides(fill = guide_legend(title = "Experience with\nPreregistration",
+                             label.position = "right",
+                             title.position = "top", title.vjust = 1)) 
 
 # Print plot 
 interval_plot
 
 # Save for the paper
-ggsave(here::here("figures/interval_plot.eps"), device = "eps", plot = interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
+ggsave(here::here("figures/interval_plot.eps"), device = "eps", plot = interval_plot, dpi = 300, width = 35, height = 17, units = "cm")
 
 # Save for the manuscript
-ggsave(here::here("figures/interval_plot.png"), device = "png", plot = interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
+ggsave(here::here("figures/interval_plot.png"), device = "png", plot = interval_plot, dpi = 300, width = 35, height = 17, units = "cm")
 ```
 
 # Responses by research type group for all survey questions
@@ -586,6 +681,7 @@ Creating plots for the Likert-type scales.
 ```{r}
 # Get data for plot
 likert_plot_data_researc_type_recommend <- prepare_likert_plot_data(research_type_questions, "recommend")
+levels(likert_plot_data_researc_type_recommend$levels) <- c("Very strongly\ndisagree", "2", "3", "4", "5", "6", "Very strongly\nagree", "I do not know", "Not applicable" )
 
 # Create the plot
 research_type_likert_plot_recommend <- 
@@ -608,15 +704,16 @@ research_type_likert_plot_recommend <-
 research_type_likert_plot_recommend
 
 # Save for the paper
-ggsave(here::here("figures/research_type_likert_plot_recommend.eps"), device = "eps", plot = research_type_likert_plot_recommend, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+ggsave(here::here("figures/research_type_likert_plot_recommend.eps"), device = "eps", plot = research_type_likert_plot_recommend, dpi = 300, width = figure_width, height = figure_height, units = "cm")
 
 # Save for the manuscript
-ggsave(here::here("figures/research_type_likert_plot_recommend.png"), device = "png", plot = research_type_likert_plot_recommend, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+ggsave(here::here("figures/research_type_likert_plot_recommend.png"), device = "png", plot = research_type_likert_plot_recommend, dpi = 300, width = figure_width, height = figure_height, units = "cm")
 ```
 
 ```{r}
 # Get data for plot
 likert_plot_data_researc_type_qrp <- prepare_likert_plot_data(research_type_questions, "qrp")
+levels(likert_plot_data_researc_type_qrp$levels) <- c("Very strongly\ndisagree", "2", "3", "4", "5", "6", "Very strongly\nagree", "I do not know", "Not applicable" )
 
 # Create the plot
 research_type_likert_plot_qrp <- 
@@ -639,10 +736,10 @@ research_type_likert_plot_qrp <-
 research_type_likert_plot_qrp
 
 # Save for the paper
-ggsave(here::here("figures/research_type_likert_plot_qrp.eps"), device = "eps", plot = research_type_likert_plot_qrp, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+ggsave(here::here("figures/research_type_likert_plot_qrp.eps"), device = "eps", plot = research_type_likert_plot_qrp, dpi = 300, width = figure_width, height = figure_height, units = "cm")
 
 # Save for the manuscript
-ggsave(here::here("figures/research_type_likert_plot_qrp.png"), device = "png", plot = research_type_likert_plot_qrp, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+ggsave(here::here("figures/research_type_likert_plot_qrp.png"), device = "png", plot = research_type_likert_plot_qrp, dpi = 300, width = figure_width, height = figure_height, units = "cm")
 ```
 
 ```{r}
@@ -670,11 +767,56 @@ research_type_likert_plot_planning <-
 research_type_likert_plot_planning
 
 # Save for the paper
-ggsave(here::here("figures/research_type_likert_plot_planning.eps"), device = "eps", plot = research_type_likert_plot_planning, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+ggsave(here::here("figures/research_type_likert_plot_planning.eps"), device = "eps", plot = research_type_likert_plot_planning, dpi = 300, width = figure_width, height = figure_height, units = "cm")
 
 # Save for the manuscript
-ggsave(here::here("figures/research_type_likert_plot_planning.png"), device = "png", plot = research_type_likert_plot_planning, dpi = 300, width = 5905.512, height = 1771.654, units = "px")
+ggsave(here::here("figures/research_type_likert_plot_planning.png"), device = "png", plot = research_type_likert_plot_planning, dpi = 300, width = figure_width, height = figure_height, units = "cm")
 ```
+
+```{r new_likert_research_type_plots}
+research_type_likert_plot_qrp <- 
+likert_plot_new(likert_plot_data_researc_type_qrp, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"Preregistration made/would make it easier to avoid questionable\nresearch practices."', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = FALSE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend1 <- cowplot::get_legend(research_type_likert_plot_qrp + theme(legend.position = c(0.5,0.5)))
+
+research_type_likert_plot_recommend <- 
+likert_plot_new(likert_plot_data_researc_type_recommend, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"I would recommend preregistration to other researchers in my field."', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = FALSE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend2 <- cowplot::get_legend(research_type_likert_plot_recommend + theme(legend.position = c(0.5,0.5)))
+
+research_type_likert_plot_planning <- 
+likert_plot_new(likert_plot_data_researc_type_planning, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"How often are you planning to preregister your empirical studies\nin the future?"', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = TRUE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend3 <- cowplot::get_legend(research_type_likert_plot_planning + theme(legend.position = c(0.5,0.5)))
+
+research_type_likert_plots <- 
+cowplot::plot_grid(research_type_likert_plot_qrp, legend1,
+                   research_type_likert_plot_recommend, legend2,
+                   research_type_likert_plot_planning, legend3,
+                   ncol=2,nrow=3, rel_widths = c(1,.2), rel_heights = c(.7,.7,.7))
+
+# Save for the paper
+ggsave(here::here("figures/all_research_type_likert_plots.eps"), device = "eps", plot = research_type_likert_plots, dpi = 500, width = 35, height = 25, units = "cm")
+
+# Save for the manuscript
+ggsave(here::here("figures/all_research_type_likert_plots.png"), device = "png", plot = research_type_likert_plots, dpi = 500, width = 35, height = 25, units = "cm")
+```
+
 
 The other questions were using a 7 point scale that we will treat as an interval scale. This plot presents the mean rating per question per group with the 95% CI as the errorbar.
 
@@ -767,7 +909,7 @@ research_type_interval_plot <-
     # Text horizontal adjustment
     hjust = 0.7) +
   # Color of the fill
-  scale_fill_manual(values = c("white", "grey")) +
+  scale_fill_manual(values = c("white", "grey"), labels = c("Other", "Testing")) +
   scale_x_continuous(
     breaks = as.integer(unique(research_type_interval_plot_data$vars)),
     labels = unique(research_type_interval_plot_data$vars),
@@ -775,7 +917,7 @@ research_type_interval_plot <-
   scale_y_continuous(
     expand = c(0, 0.4),
     breaks = c(1, 2, 3, 4, 5, 6, 7),
-    labels = c("1\nDisadvantage", "2", "3", "4", "5", "6", "7\nAdvantage")) +
+    labels = c("1\n\nDisadvantage", "2", "3", "4", "5", "6", "7\n\nAdvantage")) +
   # Redrawing the axes
   geom_segment(
     aes(x = 1, xend = 9, y = -Inf, yend = -Inf)) +
@@ -785,8 +927,7 @@ research_type_interval_plot <-
   coord_flip(ylim = c(1, 7)) +
   # Add labels
   labs(x = "Aspect of Research",
-       y = "Mean Rating",
-       fill = "Groups") +
+       y = "Mean Rating") +
   # Change legend text order
   guides(fill = guide_legend(reverse = TRUE)) +
   # Theme options
@@ -800,16 +941,20 @@ research_type_interval_plot <-
         axis.line = element_blank(),
         legend.text = element_text(size = 20),
         legend.title = element_text(size = 22),
-        legend.position = c(.2, .8)
-  )
+        legend.position = c(.2, .8),
+        legend.direction = "horizontal"
+        ) +
+  guides(fill = guide_legend(title = "Empirical Approach",
+                             label.position = "right",
+                             title.position = "top", title.vjust = 1)) 
 
 research_type_interval_plot
 
 # Save for the paper
-ggsave(here::here("figures/research_type_interval_plot.eps"), device = "eps", plot = research_type_interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
+ggsave(here::here("figures/research_type_interval_plot.eps"), device = "eps", plot = research_type_interval_plot, dpi = 300, width = 35, height = 17, units = "cm")
 
 # Save for the manuscript
-ggsave(here::here("figures/research_type_interval_plot.png"), device = "png", plot = research_type_interval_plot, dpi = 300, width = 50, height = 25, units = "cm")
+ggsave(here::here("figures/research_type_interval_plot.png"), device = "png", plot = research_type_interval_plot, dpi = 300, width = 35, height = 17, units = "cm")
 ```
 
 # Background information
@@ -832,7 +977,8 @@ fields_gathered <-
 fields_gathered %>% 
   count(final_field_value) %>% 
   arrange(desc(n)) %>% 
-  mutate(N = sum(n))
+  mutate(N = sum(n),
+         percent = round(n/sum(n)*100,3))
   
 fields_plot <-
   fields_gathered %>% 
@@ -843,12 +989,20 @@ fields_plot <-
   ggplot() +
   aes(y = n,
       x = final_field_value) +
-  geom_bar(stat = "identity") +
+  # geom_bar(color = "black",
+  #          stat = "identity",
+  #          fill = "grey90",
+  #          width = 1.3
+  #          ) +
+  geom_col(stat = "identity",
+           fill = "grey90",
+           color = "black",
+           ) +
   scale_y_continuous(
     expand = c(0, 0),
     limits = c(0, 130)) +
-  labs(x = "Fields",
-       y = "Number of Participants") +
+  labs(x = "Research Background",
+       y = "Number of Respondents") +
   coord_flip() +
   papaja::theme_apa() +
   theme(
@@ -856,11 +1010,10 @@ fields_plot <-
     axis.title = element_text(size = 30),
     panel.background = element_blank(),
     panel.grid = element_blank(),
-    axis.text = element_text(size = 15),
+    axis.text = element_text(size = 20),
     axis.ticks = element_blank(),
     strip.background = element_blank(),
     strip.text = element_text(hjust = 0, face = 'bold', size = 25),
-    panel.border = element_rect(color = 'gray90', linetype = "dashed", fill = NA),
     legend.key.size = unit(1, 'cm'),
     legend.text = element_text(size = 15))
 
@@ -872,3 +1025,414 @@ ggsave(here::here("figures/Fields.eps"), device = "eps", plot = fields_plot, dpi
 # Save gathered plot for the manuscript
 ggsave(here::here("figures/Fields.png"), device = "png", plot = fields_plot, dpi = 300, width = 45, height = 25, units = "cm")
 ```
+
+```{r}
+fields_gathered <- table(fields_gathered$final_field_value)
+# order fields based on frequency, but put "Other" last
+fields_freq <- fields_gathered[order(fields_gathered, decreasing = FALSE)]
+fields_other <- fields_freq['Other']
+fields_freq <- fields_freq[-7]
+fields_freq <- c(fields_other, fields_freq)
+
+
+par(mar=c(5.1, 10, 4.1, 2.1), mgp=c(3, 1, 0), las=0)
+# reorder based on proportion included 
+barplot(height = fields_freq, axes = FALSE, xlim = c(0, 120), 
+        width = 1, cex.names = 0.95, las = 2, horiz = TRUE, 
+        col = 'grey90')
+par(las = 1)
+axis(1, at = seq(0, 120, 30), labels = seq(0, 120, 30), lwd = 2, cex.axis = 1)
+par(las = 0)
+mtext("Number of Respondents", side = 1, line = 3.1, cex = 1.5)
+```
+
+# Exploratory Analyses
+## Information about the Researchers in the `Other' Group
+
+```{r import_other}
+other_data <- readr::read_tsv(here::here("data/main/processed/PreregistrationEvaluation_Others_Processed.tsv"))
+
+groups <- 'other'
+
+# exclude respondents who made experience with Registered Reports
+other_processed <- other_data %>% 
+  filter(group_sorting_1 == 'Yes', # experience with prereg
+         group_sorting_2 == 'No',  # published prereg
+         group_sorting_4 == 'No',  # experience with RR
+         group_sorting_5 == 'No'  # published RR
+)
+
+# How many respondents have only experience with RRs?
+other_data %>% 
+    filter(group_sorting_1 == 'No', # experience with prereg
+         group_sorting_2 == 'No',  # published prereg
+         group_sorting_4 == 'Yes',  # experience with RR
+         group_sorting_5 == 'Yes'  # published RR
+) %>% nrow()
+
+# How many respondents also have experience with RRs?
+other_data %>% 
+    filter(
+         group_sorting_4 == 'Yes',  # experience with RR
+         group_sorting_5 == 'Yes'  # published RR
+) %>% nrow()
+
+survey_others <-
+  expand_grid(groups = groups,
+              vars = vars) %>% 
+  mutate(type = add_question_type(vars))
+
+survey_others <-
+  survey_others %>% 
+  mutate(var_level_present = purrr::map2(groups, vars,
+                                         ~ level_present(
+                                           df = other_processed,
+                                           group_name = .x,
+                                           var_name = .y,
+                                           factor_group = .x,
+                                           group_var = group)),
+         var_level_labels = purrr::map2(groups, vars,
+                                        ~ get_levels(
+                                          df = other_processed,
+                                          group_name = .x,
+                                          var_name = .y,
+                                          factor_group = .x,
+                                          group_var = group)))
+```
+
+
+From the `r nrow(other_data)` respondents who were assigned neither to the preregistered group nor to the non-preregistered, `r sum(other_data$group_sorting_1 == 'Yes' & other_data$group_sorting_2 == 'No' & other_data$group_sorting_5 == 'No')` indicated that they made experience with preregistration but have not (yet) published a preregistration. Out of this subgroup, `r sum(other_data$group_sorting_4 == 'Yes' | other_data$group_sorting_5 == 'Yes')` researchers reported having made experience with Registered Reports, with `r sum(other_data$group_sorting_5 == 'Yes')` having published at least one. For consistency, we again exclude all respondents who have experience with Registered Reports, leaving a sample of `r nrow(other_processed)` respondents. 
+
+Calculate the count for all the levels of all the questions per group. Levels with no responses are also included with 0 for the count. For each question per group these summarized information will be nested in one list type column.
+
+```{r}
+survey_others <-
+  survey_others %>% 
+  mutate(var_desc = purrr::map2(groups, vars,
+                                ~ level_count(
+                                  df = other_processed,
+                                  group_name = .x,
+                                  var_name = .y,
+                                  group_var = group,
+                                  factor_group = .x)))
+
+survey_table_interval_others <- 
+  survey_others %>% 
+  filter(type == "interval") %>%
+  select(vars, groups, var_desc) %>% 
+  unnest(var_desc) %>% 
+  dplyr::group_by(groups, vars) %>% 
+  dplyr::mutate(N = sum(n))%>% 
+                #,prop = round(n / N * 100, 2)) %>% 
+  select(-N, -levels_int) %>% 
+  mutate(vars = vars_rename(vars),
+         groups = groups_rename(groups)) %>% 
+  arrange(vars, desc(groups)) %>% 
+  rename(Aspect = vars,
+         Group = groups,
+         Levels = levels,
+         NrResponses = n,
+         #`Proportion of the level` = prop
+         )
+
+
+survey_tab_others <- survey_table_interval_others[survey_table_interval_others$Levels == 'I do not know' | survey_table_interval_others$Levels == 'Not applicable', ]
+survey_tab_others <- reshape(as.data.frame(survey_tab_others), idvar = c('Aspect', 'Group'), timevar = 'Levels', direction="wide")
+```
+
+For the interval type questions we will calculate the mean and confidence intervals for each question per group. We will also present the results in a table.
+
+```{r}
+# Get the id of the questions
+interval_vars <- c("hypothesis", "design", "analysis", "rdm", "workflow", "collab", "preparatory", "duration", "stress")
+
+interval_table_others <- 
+  other_processed %>%
+  select(response_id, group, all_of(interval_vars)) %>%
+  pivot_longer(
+    all_of(interval_vars),
+    names_to = "vars",
+    values_to = "values") %>% 
+  filter(values != "I do not know",
+         values != "Not applicable") %>% 
+  mutate(values = as.integer(str_extract(values, "[0-9]{1,2}")), 
+         vars = vars_rename(vars)) %>%  
+  group_by(group, vars) %>% 
+  summarise(Mean = round(mean(values, na.rm = TRUE), 2),
+            SD = round(sd(values, na.rm = TRUE), 2),
+            N = n(),
+            SE = SD / sqrt(N),
+            ub = round(Mean + 1.96 * SE, 2),
+            lb = round(Mean - 1.96 * SE, 2),
+            `Confidence interval` = paste0("[", lb, ", ", ub, "]"),
+            MeanAndCI = paste(Mean, `Confidence interval`)) %>% 
+  mutate(group = groups_rename(group)) %>% 
+  arrange(desc(Mean), vars)  %>% 
+  rename(Aspect = vars,
+         Group = group
+         )
+
+# papaja::apa_table(
+#   interval_table_others,
+#   caption = "A Full Summary of the Interval Survey Questions For Researchers With Unpublished Preregistrations",
+#   escape = TRUE
+# )
+
+interval_others_short <- as.data.frame(interval_table_others)[, c('Aspect','Group','MeanAndCI')]
+interval_others_short <- merge(interval_others_short, survey_tab_others, sort = FALSE)
+papaja::apa_table(
+  interval_others_short,
+  caption = "Summary of the Answers of Each Individual Aspect on the Research Workflow For Researchers With Unpublished Preregistrations",
+  escape = TRUE
+)
+```
+Three of the questions were using a Likert-scale. We show the proportion of the response levels as horizontal barcharts. Two of them using the same scale, therefore we show them together for practical reasons.
+
+```{r}
+figure_width <- 50
+figure_height <- 17
+```
+
+```{r}
+# Get the id of the questions
+likert_plot_data_recommend_others <- prepare_likert_plot_data(survey_others, "recommend")
+levels(likert_plot_data_recommend_others$levels) <- c("Very strongly\ndisagree", "2", "3", "4", "5", "6", "Very strongly\nagree", "I do not know", "Not applicable" )
+likert_plot_data_qrp_others <- prepare_likert_plot_data(survey_others, "qrp")
+levels(likert_plot_data_qrp_others$levels) <- c("Very strongly\ndisagree", "2", "3", "4", "5", "6", "Very strongly\nagree", "I do not know", "Not applicable" )
+likert_plot_data_planning_others <- prepare_likert_plot_data(survey_others, "planning")
+
+likert_plot_data_qrp <- rbind(likert_plot_data_qrp, likert_plot_data_qrp_others)
+likert_plot_data_recommend <- rbind(likert_plot_data_recommend, likert_plot_data_recommend_others)
+likert_plot_data_planning <- rbind(likert_plot_data_planning, likert_plot_data_planning_others)
+
+# Relabel groups
+likert_plot_data_qrp$groups[likert_plot_data_qrp$groups == 'Preregistration'] <- 'Published'
+likert_plot_data_recommend$groups[likert_plot_data_recommend$groups == 'Preregistration'] <- 'Published'
+likert_plot_data_planning$groups[likert_plot_data_planning$groups == 'Preregistration'] <- 'Published'
+
+likert_plot_data_qrp$groups[likert_plot_data_qrp$groups == 'Non-Preregistration'] <- 'No Experience'
+likert_plot_data_recommend$groups[likert_plot_data_recommend$groups == 'Non-Preregistration'] <- 'No Experience'
+likert_plot_data_planning$groups[likert_plot_data_planning$groups == 'Non-Preregistration'] <- 'No Experience'
+
+# Change the order of the groups
+likert_plot_data_qrp$groups <- factor(likert_plot_data_qrp$groups, levels = c('No Experience', 'Unpublished', 'Published'))
+likert_plot_data_recommend$groups <- factor(likert_plot_data_recommend$groups, levels = c('No Experience', 'Unpublished', 'Published'))
+likert_plot_data_planning$groups <- factor(likert_plot_data_planning$groups, levels = c('No Experience', 'Unpublished', 'Published'))
+```
+
+```{r new_likert_plots_others}
+likert_plot_qrp <- 
+likert_plot_new(likert_plot_data_qrp, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"Preregistration made/would make it easier to avoid questionable\nresearch practices."', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = FALSE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend1 <- cowplot::get_legend(likert_plot_qrp + theme(legend.position = c(0.5,0.5)))
+
+likert_plot_recommend <- 
+likert_plot_new(likert_plot_data_recommend, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"I would recommend preregistration to other researchers in my field."', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = FALSE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend2 <- cowplot::get_legend(likert_plot_recommend + theme(legend.position = c(0.5,0.5)))
+
+likert_plot_planning <- 
+likert_plot_new(likert_plot_data_planning, 
+                groups = groups,
+                levels = levels, 
+                n = n,
+                title = '"How often are you planning to preregister your empirical studies\nin the future?"', 
+                levels_to_drop = c("I do not know", "Not applicable"),
+                yaxis = TRUE, limits = c(-1,1.2), textsize = 18, text_push = 0.1)
+legend3 <- cowplot::get_legend(likert_plot_planning + theme(legend.position = c(0.5,0.5)))
+
+likert_plots <- 
+cowplot::plot_grid(likert_plot_qrp, legend1,
+                   likert_plot_recommend, legend2,
+                   likert_plot_planning, legend3,
+                   ncol=2,nrow=3, rel_widths = c(1,.2), rel_heights = c(.7,.7,.7))
+
+# Save for the paper
+ggsave(here::here("figures/all_likert_plots_others_three.eps"), device = "eps", plot = likert_plots, dpi = 500, width = 35, height = 25, units = "cm")
+
+# Save for the manuscript
+ggsave(here::here("figures/all_likert_plots_others_three.png"), device = "png", plot = likert_plots, dpi = 500, width = 35, height = 25, units = "cm")
+```
+
+The other questions were using a 7 point scale that we will treat as an interval scale. This plot presents the mean rating per question per group with the 95% CI as the errorbar.
+
+```{r, message = FALSE}
+interval_plot <-
+  interval_table_others %>%
+  mutate(Aspect = factor(Aspect, levels = rev(interval_table_others$Aspect))) %>%
+  ggplot() +
+  aes(x = Aspect,
+      y = Mean) +
+  # Set error bars
+  ## Error bar for prereg group with nudged position
+  geom_errorbar(
+    aes(
+      ymin = lb,
+      ymax = ub) ,
+    width = .3,
+    size = 0.8) +
+  geom_point(
+    size = 7,
+    shape = 21,
+    fill = 'grey36') +
+  # Color of the fill
+  scale_y_continuous(
+    expand = c(0, 0.4),
+    breaks = c(1, 2, 3, 4, 5, 6, 7),
+    labels = c("1\n\nDisadvantage", "2", "3", "4", "5", "6", "7\n\nAdvantage")) +
+  # Redrawing the axes
+  geom_segment(
+    aes(x = 1, xend = 9, y = -Inf, yend = -Inf)) +
+  geom_segment(
+    aes(y = 1, yend = 7, x = -Inf, xend = -Inf)) +
+  # Flip the axis
+  coord_flip(ylim = c(1, 7)) +
+  # Add labels
+  labs(x = "Aspect of Research",
+       y = "Mean Rating") +
+  # Theme options
+  papaja::theme_apa() +
+  theme(axis.title = element_text(size = 22),
+        axis.title.y.right = element_text(margin = margin(l = -15, b = 10)),
+        axis.text.y.right = element_blank(),
+        axis.ticks.y.right = element_blank(),
+        axis.line.y.right = element_blank(),
+        axis.text = element_text(size = 20),
+        axis.line = element_blank(),
+        legend.text = element_blank(),
+        legend.title = element_blank(),
+        legend.position = "none",
+        legend.direction = "horizontal"
+        ) 
+
+# Print plot 
+interval_plot
+
+# Save for the paper
+ggsave(here::here("figures/interval_plot_others.eps"), device = "eps", plot = interval_plot, dpi = 300, width = 35, height = 17, units = "cm")
+
+# Save for the manuscript
+ggsave(here::here("figures/interval_plot_others.png"), device = "png", plot = interval_plot, dpi = 300, width = 35, height = 17, units = "cm")
+```
+
+Alternatively we can plot all three groups together!
+
+```{r}
+interval_plot_three <- interval_plot_data[, c("vars", "groups", "mean", "sd", "n", "se", "ub", "lb")]
+colnames(interval_plot_three) <- c("Aspect", "Group", "Mean", "SD", "N", "SE", "ub", "lb")
+interval_plot_three$Group[interval_plot_three$Group == 'Yes'] <- 'Published'
+interval_plot_three <- rbind(interval_plot_three, interval_table_others[, c("Aspect", "Group", "Mean", "SD", "N", "SE", "ub", "lb")])
+
+# Create the plot
+interval_plot <-
+  interval_plot_three %>%
+  ggplot() +
+  aes(x = as.integer(Aspect),
+      y = Mean,
+      fill = Group,
+      group = Group) +
+  # Set error bars
+  ## Error bar for prereg group with nudged position
+  geom_errorbar(
+    data = pick(Group == "Published"),
+    aes(
+      ymin = Mean - (SE * 1.96),
+      ymax = Mean + (SE * 1.96)),
+    width = .3,
+    size = 0.3,
+    position = position_nudge(x = -0.3, y = 0)) +
+  ## Error bar for control group without nudged position
+  geom_errorbar(
+    data = pick(Group == "No"),
+    aes(
+      ymin = Mean - (SE * 1.96),
+      ymax = Mean + (SE * 1.96)),
+    width = .3,
+    size = 0.3,
+    position = position_nudge(x = +0.1, y = 0)) +
+  ## Error bar for unsuccessful group with nudged position
+  geom_errorbar(
+    data = pick(Group == "Unpublished"),
+    aes(
+      ymin = Mean - (SE * 1.96),
+      ymax = Mean + (SE * 1.96)),
+    width = .3,
+    size = 0.7,
+    position = position_nudge(x = -0.1, y = 0)) +
+  # Set points
+  ## Points of prereg group with nudged position
+  geom_point(
+    data = pick(Group == "Published"),
+    size = 6,
+    shape = 21,
+    position = position_nudge(x = -0.3, y = 0)) +
+  ## Points of control group without nudged position
+  geom_point(
+    data = pick(Group == "No"),
+    size = 6,
+    shape = 21,
+    position = position_nudge(x = +0.1, y = 0)) +
+  ## Points of unsuccessful group with nudged position
+  geom_point(
+    data = pick(Group == "Unpublished"),
+    size = 6,
+    shape = 21,
+    position = position_nudge(x = -0.1, y = 0)) +
+  # Color of the fill
+  scale_fill_manual(values = c("white", "grey", "grey36")) +
+  scale_x_continuous(
+    breaks = as.integer(unique(interval_plot_three$Aspect)),
+    labels = unique(interval_plot_three$Aspect)) +
+  scale_y_continuous(
+    expand = c(0, 0.4),
+    breaks = c(1, 2, 3, 4, 5, 6, 7),
+    labels = c("1\n\nDisadvantage", "2", "3", "4", "5", "6", "7\n\nAdvantage")) +
+  # Redrawing the axes
+  geom_segment(
+    aes(x = 1, xend = 9, y = -Inf, yend = -Inf)) +
+  geom_segment(
+    aes(y = 1, yend = 7, x = -Inf, xend = -Inf)) +
+  # Flip the axis
+  coord_flip(ylim = c(1, 7)) +
+  # Add labels
+  labs(x = "Aspect of Research",
+       y = "Mean Rating") +
+  # Theme options
+  papaja::theme_apa() +
+  theme(axis.title = element_text(size = 22),
+        axis.title.y.right = element_text(margin = margin(l = -15, b = 10)),
+        axis.text.y.right = element_blank(),
+        axis.ticks.y.right = element_blank(),
+        axis.line.y.right = element_blank(),
+        axis.text = element_text(size = 20),
+        axis.line = element_blank(),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 22),
+        legend.position = c(.2, .8),
+        #legend.direction = "horizontal"
+        ) +
+  guides(fill = guide_legend(title = "Experience with\nPreregistration",
+                             label.position = "right",
+                             title.position = "top", title.vjust = 1)) 
+
+# Print plot 
+interval_plot
+
+# Save for the paper
+ggsave(here::here("figures/interval_plot_others_three.eps"), device = "eps", plot = interval_plot, dpi = 300, width = 35, height = 17, units = "cm")
+
+# Save for the manuscript
+ggsave(here::here("figures/interval_plot_others_three.png"), device = "png", plot = interval_plot, dpi = 300, width = 35, height = 17, units = "cm")
+```
+
+
