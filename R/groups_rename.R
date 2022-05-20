@@ -8,5 +8,6 @@ groups_rename <- function(group_name) {
             {{group_name}} == "control" ~ "Control",
             {{group_name}} == "testing" ~ "Testing",
             {{group_name}} == "else" ~ "Else",
+            {{group_name}} == "other" ~ "Unpublished",
             TRUE ~ NA_character_)
 }

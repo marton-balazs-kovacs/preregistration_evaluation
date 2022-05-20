@@ -73,7 +73,7 @@ factor_order <- function(factor_var, group, var) {
       "7\nWould be reduced",
       "I do not know",
       "Not applicable"))
-  } else if (group %in% c("control", "prereg") & var %in% c("qrp","recommend")) {
+  } else if (group %in% c("control", "prereg", "other") & var %in% c("qrp","recommend")) {
     factor(
       {{factor_var}},
       levels = c(
@@ -86,7 +86,7 @@ factor_order <- function(factor_var, group, var) {
       "Very Strongly Agree",
       "I do not know",
       "Not applicable"))
-  } else if (group == "prereg" & var %in% c("hypothesis", "design", "analysis", "rdm", "workflow")) {
+  } else if (group %in% c("prereg", "other") & var %in% c("hypothesis", "design", "analysis", "rdm", "workflow")) {
     factor(
       {{factor_var}},
       levels = c(
@@ -99,7 +99,7 @@ factor_order <- function(factor_var, group, var) {
       "7\nGot more thought-through",
       "I do not know",
       "Not applicable"))
-  } else if (group == "prereg" & var == "collab") {
+  } else if (group %in% c("prereg", "other") & var == "collab") {
     factor(
       {{factor_var}},
       levels = c(
@@ -112,7 +112,7 @@ factor_order <- function(factor_var, group, var) {
       "7\nGot better",
       "I do not know",
       "Not applicable"))
-  } else if (group == "prereg" & var == "preparatory") {
+  } else if (group %in% c("prereg", "other") & var == "preparatory") {
     factor(
       {{factor_var}},
       levels = c(
@@ -125,7 +125,7 @@ factor_order <- function(factor_var, group, var) {
       "7\nImproved",
       "I do not know",
       "Not applicable"))
-  } else if (group == "prereg" & var == "duration") {
+  } else if (group %in% c("prereg", "other") & var == "duration") {
     factor(
       {{factor_var}},
       levels = c(
@@ -138,7 +138,7 @@ factor_order <- function(factor_var, group, var) {
       "7\nWas shorter",
       "I do not know",
       "Not applicable"))
-  } else if (group == "prereg" & var == "stress") {
+  } else if (group %in% c("prereg", "other") & var == "stress") {
     factor(
       {{factor_var}},
       levels = c(
@@ -151,7 +151,7 @@ factor_order <- function(factor_var, group, var) {
       "7\nWas reduced",
       "I do not know",
       "Not applicable"))
-  } else if (group %in% c("control", "prereg") & var == "planning") {
+  } else if (group %in% c("control", "prereg", "other") & var == "planning") {
     factor(
       {{factor_var}},
       levels = c(
